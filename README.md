@@ -1,6 +1,6 @@
 KHAN Encryption Algorithm
 
-KHAN (Keyed Hashing and Asymmetric Nonce) encryption is an innovative cryptographic algorithm designed to provide robust security through the use of cyclic prime number sequences. This README provides an overview of the KHAN encryption algorithm, its implementation, usage, and performance comparison with other popular encryption methods like RSA and AES.
+KHAN (Keyed Hashing with Asymmetric Nonce) encryption is an innovative cryptographic algorithm designed to provide robust security through the use of cyclic prime number sequences. This README provides an overview of the KHAN encryption algorithm, its implementation, usage, and performance comparison with other popular encryption methods like RSA and AES.
 Table of Contents
 
     Introduction
