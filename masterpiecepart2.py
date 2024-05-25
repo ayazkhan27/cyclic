@@ -59,7 +59,7 @@ def measure_khan_encryption(plaintext, start_position, superposition_sequence_le
     decrypted_text = ke.khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, cyclic_prime, start_position, cyclic_sequence)
     decryption_time = time.time() - start_time
 
-    return encryption_time, decryption_time, decrypted_text, start_position, superposition_sequence, z_value, cyclic_sequence
+    return encryption_time, decryption_time, decrypted_text
 
 def main():
     global cyclic_prime
@@ -72,21 +72,15 @@ def main():
     plaintext = ke.generate_plaintext(128)
 
     # Measure encryption and decryption
-    encryption_time, decryption_time, decrypted_text, start_position, superposition_sequence, z_value, cyclic_sequence = measure_khan_encryption(plaintext, start_position, superposition_sequence_length)
+    encryption_time, decryption_time, decrypted_text = measure_khan_encryption(plaintext, start_position, superposition_sequence_length)
 
-    # Display results first
+    # Display results
     print("\nEncryption and Decryption Results:")
     print("Original Plaintext:", plaintext)
     print("Decrypted Plaintext:", decrypted_text)
     print(f"Encryption Time: {encryption_time} seconds")
     print(f"Decryption Time: {decryption_time} seconds")
     print("Decryption Successful" if plaintext == decrypted_text else "Decryption Failed")
-
-    # Then display private and public key information
-    print("\nKey Information:")
-    print("User 1 Private Key (Starting Dial Position):", start_position)
-    print("User 2 Private Key (Superposition Sequence and Z-Value):", superposition_sequence, z_value)
-    print("Public Key (Cyclic Prime and Cyclic Sequence):", cyclic_prime, cyclic_sequence)
 
 if __name__ == "__main__":
     main()
