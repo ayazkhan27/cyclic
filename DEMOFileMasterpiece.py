@@ -63,7 +63,7 @@ def measure_khan_encryption(plaintext, start_position, superposition_sequence_le
 
 def main():
     global cyclic_prime
-    cyclic_prime = 323901748  # Set the cyclic prime to 1051
+    cyclic_prime = 1051  # Set the cyclic prime to 1051
 
     # Get user input for private keys
     start_position, superposition_sequence_length = get_user_input()

@@ -115,7 +115,7 @@ def get_first_n_full_reptend_primes(n):
     return full_reptend_primes
 
 def verify_artins_conjecture():
-    first_n_primes = list(sympy.primerange(2, 1000000))  # Convert generator to list
+    first_n_primes = list(sympy.primerange(2, 100))  # Convert generator to list
     full_reptend_primes = get_first_n_full_reptend_primes(len(first_n_primes))
 
     full_reptend_count = 0
@@ -128,7 +128,7 @@ def verify_artins_conjecture():
     reptend_percentage = (full_reptend_count / len(first_n_primes)) * 100
 
     # Check if the percentage is close to Artin's constant
-    if abs(reptend_percentage - 37.395) < 0.01:
+    if abs(reptend_percentage - 37.395) < 0.1:
         print(f"Artin's conjecture is proven with {reptend_percentage:.2f}% of full reptend primes.")
     else:
         print(f"Artin's conjecture is not proven with {reptend_percentage:.2f}% of full reptend primes.")

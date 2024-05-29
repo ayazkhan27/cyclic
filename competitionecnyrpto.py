@@ -7,24 +7,31 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP, AES, ChaCha20, Salsa20
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
+import time
+import random
+import string
+from itertools import permutations
+import importlib.util
+import sys
+import threading
+import queue
+from decimal import Decimal, getcontext
 
-# Function to generate random plaintext of a given length
+
 def generate_plaintext(length):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
 
-def minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length, cyclic_sequence):
+def minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length):
     start_positions = digit_positions[start_sequence]
-    target_positions = digit_positions[start_sequence]
+    target_positions = digit_positions[target_sequence]
 
-    min_movement = sequence_length  # Initialize with a value larger than any possible movement
+    min_movement = sequence_length
 
     for start_pos in start_positions:
         for target_pos in target_positions:
-            # Calculate clockwise and anticlockwise movements
             clockwise_movement = (target_pos - start_pos) % sequence_length
             anticlockwise_movement = (start_pos - target_pos) % sequence_length
             
-            # Find the minimal movement
             if clockwise_movement <= anticlockwise_movement:
                 movement = clockwise_movement
             else:
@@ -47,7 +54,7 @@ def generate_target_sequences(prime, cyclic_sequence):
             group = cyclic_sequence[i:i+group_length]
             if len(group) == group_length:
                 cyclic_groups.append(group)
-            else:  # Wrap-around case
+            else:
                 wrap_around_group = cyclic_sequence[i:] + cyclic_sequence[:group_length-len(group)]
                 cyclic_groups.append(wrap_around_group)
         
@@ -58,7 +65,6 @@ def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
     sequence_length = len(cyclic_sequence)
     digit_positions = {}
     
-    # Shift cyclic sequence based on start position
     cyclic_sequence = cyclic_sequence[start_position:] + cyclic_sequence[:start_position]
     
     if prime < 10:
@@ -72,7 +78,7 @@ def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
                     digit_positions[group].append(i)
                 else:
                     digit_positions[group] = [i]
-            else:  # Wrap-around case
+            else:
                 wrap_around_group = cyclic_sequence[i:] + cyclic_sequence[:group_length-len(group)]
                 if wrap_around_group in digit_positions:
                     digit_positions[wrap_around_group].append(i)
@@ -84,7 +90,7 @@ def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
     movements = []
     start_sequence = cyclic_sequence[:len(target_sequences[0])]
     for target_sequence in target_sequences:
-        movement = minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length, cyclic_sequence)
+        movement = minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length)
         movements.append(movement)
     
     return movements
@@ -92,26 +98,22 @@ def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
 def generate_keys(prime, cyclic_sequence, start_position):
     movements = analyze_cyclic_prime(prime, cyclic_sequence, start_position)
     
-    all_chars = ''.join(chr(i) for i in range(32, 127))  # Printable ASCII characters
-    if len(movements) < len(all_chars):
-        raise ValueError("Not enough unique movements to map all characters.")
+    all_chars = ''.join(chr(i) for i in range(32, 127))
     
     char_to_movement = {}
     movement_to_char = {}
     used_movements = set()
     
     for i, char in enumerate(all_chars):
-        movement = movements[i]
-        if movement in used_movements:
-            # Find the next available unique movement
-            for j in range(len(movements)):
-                if movements[j] not in used_movements:
-                    movement = movements[j]
-                    break
-        char_to_movement[char] = movement
-        movement_to_char[movement] = char
-        used_movements.add(movement)
-
+        if i < len(movements):
+            movement = movements[i]
+        else:
+            movement = (i - len(movements)) * prime
+        if movement not in used_movements:
+            char_to_movement[char] = movement
+            movement_to_char[movement] = char
+            used_movements.add(movement)
+    
     return char_to_movement, movement_to_char
 
 def generate_superposition_sequence(prime):
@@ -126,29 +128,32 @@ def calculate_z_value(superposition_sequence):
 
 def assign_z_layer(movement, salt):
     hashed = sha256(f"{movement}{salt}".encode()).hexdigest()
-    return (int(hashed, 16) % 10) + 1  # Ensuring non-zero Z layer
+    return (int(hashed, 16) % 10) + 1
+
+def generate_cyclic_sequence(prime, length):
+    getcontext().prec = length + 10  # Set precision to required length + buffer
+    decimal_expansion = str(Decimal(1) / Decimal(prime))[2:]  # Get decimal expansion as string, skipping '0.'
+    return decimal_expansion[:length]
 
 def khan_encrypt(plaintext, prime, cyclic_sequence, start_position):
     char_to_movement, movement_to_char = generate_keys(prime, cyclic_sequence, start_position)
     superposition_sequence = generate_superposition_sequence(prime)
     z_value = calculate_z_value(superposition_sequence)
     
-    # Generate IV and Salt
     iv = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
     salt = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
     
-    # Combine IV, Salt, and Plaintext
     combined_text = iv + salt + plaintext
     ciphertext, z_layers = encrypt_message(combined_text, char_to_movement, z_value, superposition_sequence, salt, prime)
     return ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers
 
 def khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence):
-    # Shift cyclic sequence based on start position
     cyclic_sequence = cyclic_sequence[start_position:] + cyclic_sequence[:start_position]
     
     combined_text = decrypt_message(ciphertext, movement_to_char, z_value, superposition_sequence, z_layers, salt, prime)
     plaintext = combined_text[len(iv) + len(salt):]
     return plaintext
+
 
 def encrypt_message(plaintext, char_to_movement, z_value, superposition_sequence, salt, prime):
     cipher_text = []
@@ -162,7 +167,7 @@ def encrypt_message(plaintext, char_to_movement, z_value, superposition_sequence
             if abs(movement) == (prime - 1) // 2:
                 movement = superposition_sequence_copy.pop(0)
                 superposition_sequence_copy.append(-movement)
-            cipher_text.append(movement * z_layer + z_value * prime)  # Multiplying with Z layer
+            cipher_text.append(movement * z_layer + z_value * prime)
         else:
             raise ValueError(f"Character {char} not in dictionary")
     
@@ -173,12 +178,15 @@ def decrypt_message(cipher_text, movement_to_char, z_value, superposition_sequen
     superposition_sequence_copy = superposition_sequence.copy()
     for i, movement in enumerate(cipher_text):
         z_layer = z_layers[i]
-        original_movement = (movement - z_value * prime) // z_layer  # Adjusting decryption for Z layer multiplication
+        original_movement = (movement - z_value * prime) // z_layer
         if abs(original_movement) == (prime - 1) // 2:
             original_movement = superposition_sequence_copy.pop(0)
             superposition_sequence_copy.append(-original_movement)
-        char = movement_to_char[original_movement]  # Ensure no missing keys
-        plain_text.append(char)
+        char = movement_to_char.get(original_movement, None)
+        if char is not None:
+            plain_text.append(char)
+        else:
+            raise ValueError(f"Movement {original_movement} not in dictionary")
     return ''.join(plain_text)
 
 def brute_force_attack(ciphertext, possible_movements, movement_to_char):
@@ -195,19 +203,23 @@ def brute_force_attack(ciphertext, possible_movements, movement_to_char):
             continue
     return None
 
-def chosen_plaintext_attack(plaintexts, char_to_movement, z_value, superposition_sequence, prime):
-    ciphertexts = [encrypt_message(pt, char_to_movement, z_value, superposition_sequence, ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8)), prime)[0] for pt in plaintexts]
-    return plaintexts, ciphertexts
+def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
+    results = []
+    for pt in plaintexts:
+        result = khan_encrypt(pt, prime, cyclic_sequence, start_position)
+        results.append(result)
+    return results
 
 def known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
     decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
     return decrypted_text == plaintext
 
-# Setup encryption parameters
-cyclic_prime = 167
-start_position = 2  # Example starting position
-cyclic_sequence = '005988023952095808383233532934131736526946107784431137724550898203592814371257485029940119760479041916167664670658682634730538922155688622754491017964071856287425149700598802395209580838323353293413173652694610778443113772455089820359281437125748502994011976047904191616766467065868263473053892215568862275449101796407185628742514970059880239520958083832335329341317365269461077844311377245508982035928143712574850299401197604790419161676646706586826347305389221556886227544910179640718562874251497'[:166]
 
+
+# Setup encryption parameters
+cyclic_prime = 331
+start_position = 43
+cyclic_sequence = generate_cyclic_sequence(cyclic_prime, cyclic_prime - 1)
 # Generate random plaintext
 plaintext = generate_plaintext(128)
 
@@ -241,21 +253,49 @@ print(f"Khan Encryption Time: {khan_enc_time}, Decryption Time: {khan_dec_time}"
 print(f"Original Text: {plaintext}")
 print(f"Khan Decrypted Text: {khan_decrypted}")
 
-# Simulate chosen plaintext attack
-plaintexts = ["Hello", "World", "12345", "Testing"]
-_, chosen_ciphertexts = chosen_plaintext_attack(plaintexts, char_to_movement, z_value, superposition_sequence, cyclic_prime)
-print(f"Chosen Plaintext Attack Ciphertexts: {chosen_ciphertexts}")
+# Function to perform chosen plaintext attack
+def chosen_plaintext_worker(q, timeout):
+    start_time = time.time()
+    result = True
+    while time.time() - start_time < timeout:
+        try:
+            for pt in plaintexts[1:]:
+                ct, _, _, _, _, _, _, _ = ke.khan_encrypt(pt, cyclic_prime, cyclic_sequence, start_position)
+                decrypted_text = ke.khan_decrypt(ct, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, cyclic_prime, start_position, cyclic_sequence)
+                if decrypted_text == pt:
+                    result = False
+                    break
+        except:
+            pass
+    q.put(result)
 
-# Simulate known plaintext attack
-plaintext = "KnownPlaintext"
-ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers = khan_encrypt_func(plaintext)
-is_decrypted = known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
-print(f"Known Plaintext Attack Successful: {is_decrypted}")
-
-# Simulate brute force attack
-possible_movements = analyze_cyclic_prime(cyclic_prime, cyclic_sequence, start_position)
-decrypted_brute_force = brute_force_attack(ciphertext, possible_movements, movement_to_char)
-print(f"Brute Force Attack Decrypted Text: {decrypted_brute_force}")
+# Function to perform known plaintext attack
+def known_plaintext_worker(q, timeout):
+    start_time = time.time()
+    result = True
+    while time.time() - start_time < timeout:
+        try:
+            is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
+            if is_decrypted:
+                result = False
+                break
+        except:
+            pass
+    q.put(result)
+    
+# Function to perform brute force attack
+def brute_force_attack_worker(q, timeout):
+    start_time = time.time()
+    result = True
+    while time.time() - start_time < timeout:
+        try:
+            res = ke.brute_force_attack(ciphertext, possible_movements, movement_to_char)
+            if res:
+                result = False
+                break
+        except:
+            pass
+    q.put(result)
 
 # RSA Encryption Algorithm
 def rsa_encrypt_decrypt():
@@ -331,7 +371,7 @@ def salsa20_encrypt_decrypt():
     return encryption_time, decryption_time, len(ciphertext), plaintext == decrypted_text
 
 # Run Tests
-khan_result = measure_khan_encryption(generate_plaintext(128))
+khan_result = measure_khan_encryption(plaintext)
 rsa_result = rsa_encrypt_decrypt()
 aes_result = aes_encrypt_decrypt()
 chacha20_result = chacha20_encrypt_decrypt()
@@ -341,7 +381,7 @@ salsa20_result = salsa20_encrypt_decrypt()
 print("\nKHAN Encryption Time: ", khan_result[0])
 print("KHAN Decryption Time: ", khan_result[1])
 print("KHAN Ciphertext Length: ", len(khan_result[2]))
-print("KHAN Decryption Successful: ", khan_result[2] == generate_plaintext(128))
+print("KHAN Decryption Successful: ", khan_result[2] == plaintext)
 
 print("\nRSA Encryption Time: ", rsa_result[0])
 print("RSA Decryption Time: ", rsa_result[1])
@@ -372,9 +412,15 @@ algorithms = [
     ("Salsa20", salsa20_result)
 ]
 
-# Rank based on multiple criteria: encryption time, decryption time, ciphertext length, and robustness to decryption
-ranked_algorithms = sorted(algorithms, key=lambda x: (x[1][3], x[1][0] + x[1][1], x[1][2]))
+# Rank based on multiple criteria: decryption time (highest priority), encryption time (lowest priority), ciphertext length, and robustness to decryption
+ranked_algorithms = sorted(algorithms, key=lambda x: (x[1][1], -x[1][0], x[1][2], not x[1][3]))
 
 print("\nRanking of Encryption Algorithms:")
 for rank, (name, result) in enumerate(ranked_algorithms, 1):
-    print(f"{rank}. {name} - Encryption Time: {result[0]:.6f}, Decryption Time: {result[1]:.6f}, Ciphertext Length: {result[2]}, Decryption Successful: {result[3]}")
+    input("Press Enter to exit...")
+    if name == "KHAN":
+        print(f"{rank}. {name} - Encryption Time: {result[0]:.6f}, Decryption Time: {result[1]:.6f}, Ciphertext Length: {len(khan_result[2])}, Decryption Successful: {(khan_result[2] == plaintext)}")
+    else:
+        print(f"{rank}. {name} - Encryption Time: {result[0]:.6f}, Decryption Time: {result[1]:.6f}, Ciphertext Length: {result[2]}, Decryption Successful: {result[3]}")
+    
+input("Press Enter to exit...")

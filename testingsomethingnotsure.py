@@ -1,3 +1,5 @@
+print("Refer to https://oeis.org/A086018 , these number of full reptend primes less than 10^n for n=1, 2, 3, 4 ... were calculated without using Artin's conjecture constant.")
+
 import sympy
 from decimal import Decimal, getcontext
 
@@ -112,7 +114,7 @@ def get_primes(limit):
 
 def main():
     base = 10  # For base 10, which is relevant to full reptend primes
-    max_n = 5  # Set the maximum n value as per the OEIS A086018 sequence
+    max_n = 4  # Set the maximum n value as per the OEIS A086018 sequence
     results = []
 
     for n in range(1, max_n + 1):
@@ -130,3 +132,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+input("Press Enter to exit...")

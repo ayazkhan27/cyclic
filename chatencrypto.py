@@ -98,14 +98,6 @@ def generate_keys(prime, cyclic_sequence):
         char_to_movement[char] = movement
         movement_to_char[movement] = char
         used_movements.add(movement)
-
-    # Debugging: print mappings
-    print("Character to Movement Mapping:")
-    for char, movement in char_to_movement.items():
-        print(f"{char}: {movement}")
-    print("\nMovement to Character Mapping:")
-    for movement, char in movement_to_char.items():
-        print(f"{movement}: {char}")
     
     return char_to_movement, movement_to_char
 
@@ -235,3 +227,5 @@ cyclic_sequence = '0059880239520958083832335329341317365269461077844311377245508
 possible_movements = analyze_cyclic_prime(cyclic_prime, cyclic_sequence)
 
 chat_simulation(10)
+
+input("Press Enter to exit...")

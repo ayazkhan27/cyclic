@@ -281,4 +281,7 @@ def run_all_tests():
     for attack, result in results.items():
         print(f"{attack.replace('_', ' ').title()} Test Result: {'Encryption Passed' if result else 'Encryption Failed'}")
 
+# Wait for user input before exiting
+    input("Press Enter to exit...")
+
 run_all_tests()

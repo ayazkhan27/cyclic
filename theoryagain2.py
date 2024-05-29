@@ -126,21 +126,11 @@ def main():
             success_count += 1
 
     success_percentage = (success_count / len(full_reptend_primes)) * 100
-    print(f"Success Percentage: {success_percentage:.2f}%")
+    print(f"Success Percentage of First Known Full Reptend Prime Numbers That Pass All 4 Theorems: {success_percentage:.2f}%")
+    input("Press Enter to exit...")
 
     failure_count = len(full_reptend_primes) - success_count
 
-    # Generate bar plots
-    labels = ['Successes', 'Failures']
-    counts = [success_count, failure_count]
-
-    plt.figure(figsize=(10, 6))
-    plt.bar(labels, counts, color=['green', 'red'])
-    plt.xlabel('Outcome')
-    plt.ylabel('Count')
-    plt.title('Success vs Failure Counts for Full Reptend Primes')
-    plt.grid(True)
-    plt.show()
 
 if __name__ == "__main__":
     main()

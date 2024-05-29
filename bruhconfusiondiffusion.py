@@ -17,9 +17,9 @@ def calculate_entropy(ciphertext):
     return entropy
 
 def test_confusion_and_diffusion():
-    prime = 167  # Example prime number
-    sequence_length = 100000  # Example sequence length
-    plaintext_length = 100
+    prime = 1051  # Example prime number
+    sequence_length = 2325326  # Example sequence length
+    plaintext_length = 128
     
     # Generate a cyclic sequence for testing
     cyclic_sequence = generate_cyclic_sequence(prime, sequence_length)
@@ -61,3 +61,5 @@ def test_confusion_and_diffusion():
 
 if __name__ == "__main__":
     test_confusion_and_diffusion()
+
+input("Press Enter to exit...")

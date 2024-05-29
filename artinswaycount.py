@@ -12,7 +12,7 @@ def count_full_reptend_primes(limit):
     return full_reptend_primes_count
 
 def main():
-    max_n = 13  # Set the maximum n value as per the OEIS A086018 sequence
+    max_n = 4  # Set the maximum n value as per the OEIS A086018 sequence
     results = []
 
     for n in range(1, max_n + 1):
