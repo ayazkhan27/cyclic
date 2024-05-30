@@ -103,7 +103,7 @@ def main():
 
     # Generate a hypothetical keyspace for simulation
     keyspace = []
-    for _ in range(1000):  # Reduced keyspace for simulation
+    for _ in range(100):  # Reduced keyspace for simulation
         possible_key = {
             'char_to_movement': char_to_movement,
             'movement_to_char': movement_to_char,
