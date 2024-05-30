@@ -1,15 +1,18 @@
 import random
 import string
-import numpy as np
+import math
 from collections import Counter
+from decimal import Decimal, getcontext
+import numpy as np
 from scipy.stats import entropy as kl_divergence
 import matplotlib.pyplot as plt
+
+# Import the khan_encryption_2 module from the specific path
 import importlib.util
 import sys
 
-# Import the khan_encryption_2 module from a specific path
-module_name = "khan_encryption_2"
-file_path = "C:/Users/admin/Documents/GitHub/cyclic/khan_encryption_2.py"  # Updated with the actual path
+module_name = "khan_encryption2.0"
+file_path = "C:/Users/admin/Documents/GitHub/cyclic/khan_encryption_2.py"
 
 spec = importlib.util.spec_from_file_location(module_name, file_path)
 ke = importlib.util.module_from_spec(spec)
@@ -17,7 +20,6 @@ sys.modules[module_name] = ke
 spec.loader.exec_module(ke)
 
 def generate_cyclic_sequence(prime, length):
-    from decimal import Decimal, getcontext
     getcontext().prec = length + 10
     decimal_expansion = str(Decimal(1) / Decimal(prime))[2:]
     return decimal_expansion[:length]
@@ -36,19 +38,8 @@ def calculate_entropy(message):
     char_count = Counter(message)
     for count in char_count.values():
         p_x = count / len(message)
-        entropy += - p_x * np.log2(p_x)
+        entropy += - p_x * math.log2(p_x)
     return entropy
-
-def kl_divergence_metric(p, q, smoothing_factor=1e-10):
-    p_counts = Counter(p)
-    q_counts = Counter(q)
-    all_chars = set(p + q)
-    
-    # Apply smoothing
-    p_dist = np.array([(p_counts[char] + smoothing_factor) / (len(p) + smoothing_factor * len(all_chars)) for char in all_chars])
-    q_dist = np.array([(q_counts[char] + smoothing_factor) / (len(q) + smoothing_factor * len(all_chars)) for char in all_chars])
-    
-    return kl_divergence(p_dist, q_dist)
 
 def mutual_information(message1, message2):
     joint_prob = Counter(zip(message1, message2))
@@ -58,7 +49,7 @@ def mutual_information(message1, message2):
         p_xy = count / total_pairs
         p_x = message1.count(x) / len(message1)
         p_y = message2.count(y) / len(message2)
-        mi += p_xy * np.log2(p_xy / (p_x * p_y))
+        mi += p_xy * math.log2(p_xy / (p_x * p_y))
     return mi
 
 def calculate_shannon_entropy(message):
@@ -97,25 +88,20 @@ def measure_khan_encryption(plaintext, prime, start_position, superposition_sequ
     z_value = superposition_sequence_length - 1
     ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers = ke.khan_encrypt(
         plaintext, prime, cyclic_sequence, start_position, superposition_sequence_length)
-    
-    # Ensure all movements are mapped
-    if -1 not in movement_to_char:
-        movement_to_char[-1] = 'dummy_char_for_mapping'
-    if 1 not in movement_to_char:
-        movement_to_char[1] = 'dummy_char_for_mapping'
-        
     decrypted_text = ke.khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
-    
-    # Remove dummy mappings after decryption
-    if -1 in movement_to_char:
-        del movement_to_char[-1]
-    if 1 in movement_to_char:
-        del movement_to_char[1]
-    
     return decrypted_text
 
-def simulate_entropy_measurements_khan(iterations=100):
+def kl_divergence_metric(p, q):
+    p_counts = Counter(p)
+    q_counts = Counter(q)
+    p_dist = np.array([p_counts[char] / len(p) for char in set(p + q)])
+    q_dist = np.array([q_counts[char] / len(q) for char in set(p + q)])
+    return kl_divergence(p_dist, q_dist)
+
+def simulate_entropy_measurements(iterations=100):
     cyclic_prime = 1051
+    start_position = 43
+    superposition_sequence_length = 224
     entropy_info, entropy_noise = [], []
     kl_info, kl_noise = [], []
     mi_info, mi_noise = [], []
@@ -124,8 +110,6 @@ def simulate_entropy_measurements_khan(iterations=100):
     for _ in range(iterations):
         plaintext_info = generate_message(128)
         plaintext_noise = generate_message(128, random_noise=True)
-        start_position = random.randint(0, cyclic_prime - 2)
-        superposition_sequence_length = random.choice([i for i in range(5, 21) if i % 2 == 0])
 
         decrypted_info = measure_khan_encryption(plaintext_info, cyclic_prime, start_position, superposition_sequence_length)
         decrypted_noise = measure_khan_encryption(plaintext_noise, cyclic_prime, start_position, superposition_sequence_length)
@@ -144,36 +128,37 @@ def simulate_entropy_measurements_khan(iterations=100):
 
     return entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noise, cse_info, cse_noise
 
-def plot_results(entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noise, cse_info, cse_noise):
-    # Plotting entropy difference
+def plot_entropy_comparison(entropy_info, entropy_noise):
     info_diffs = [x[1] - x[0] for x in entropy_info]
     noise_diffs = [x[1] - x[0] for x in entropy_noise]
+
     plt.figure(figsize=(10, 6))
     plt.boxplot([info_diffs, noise_diffs], labels=['Information-Rich', 'Random Noise'])
     plt.title('Entropy Difference Comparison')
     plt.ylabel('Entropy Difference')
     plt.show()
 
-    # Plotting KL-divergence
+def plot_kl_divergence(kl_info, kl_noise):
     plt.figure(figsize=(10, 6))
     plt.boxplot([kl_info, kl_noise], labels=['Information-Rich', 'Random Noise'])
     plt.title('KL-Divergence Comparison')
     plt.ylabel('KL-Divergence')
     plt.show()
 
-    # Plotting mutual information
+def plot_mutual_information(mi_info, mi_noise):
     plt.figure(figsize=(10, 6))
-    plt.plot(mi_info, label='Information-Rich')
-    plt.plot(mi_noise, label='Random Noise')
+    plt.plot(mi_info, label='Information-Rich', color='blue')
+    plt.plot(mi_noise, label='Random Noise', color='orange')
     plt.title('Mutual Information over Iterations')
     plt.xlabel('Iteration')
     plt.ylabel('Mutual Information')
     plt.legend()
     plt.show()
 
-    # Plotting CSE difference
+def plot_cse_comparison(cse_info, cse_noise):
     info_diffs = [x[1] - x[0] for x in cse_info]
     noise_diffs = [x[1] - x[0] for x in cse_noise]
+
     plt.figure(figsize=(10, 6))
     plt.boxplot([info_diffs, noise_diffs], labels=['Information-Rich', 'Random Noise'])
     plt.title('Coherent Shannon Entropy (CSE) Difference Comparison')
@@ -182,7 +167,7 @@ def plot_results(entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noi
 
 def main():
     iterations = 1000
-    entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noise, cse_info, cse_noise = simulate_entropy_measurements_khan(iterations)
+    entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noise, cse_info, cse_noise = simulate_entropy_measurements(iterations)
 
     avg_entropy_info = np.mean([x[1] - x[0] for x in entropy_info])
     avg_entropy_noise = np.mean([x[1] - x[0] for x in entropy_noise])
@@ -203,7 +188,10 @@ def main():
     print("Average CSE Difference (Random Noise):", avg_cse_noise)
 
     # Plotting the results
-    plot_results(entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noise, cse_info, cse_noise)
+    plot_entropy_comparison(entropy_info, entropy_noise)
+    plot_kl_divergence(kl_info, kl_noise)
+    plot_mutual_information(mi_info, mi_noise)
+    plot_cse_comparison(cse_info, cse_noise)
 
 if __name__ == "__main__":
     main()

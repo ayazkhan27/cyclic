@@ -39,12 +39,15 @@ def calculate_entropy(message):
         entropy += - p_x * np.log2(p_x)
     return entropy
 
-def kl_divergence_metric(p, q):
+def kl_divergence_metric(p, q, smoothing_factor=1e-10):
     p_counts = Counter(p)
     q_counts = Counter(q)
     all_chars = set(p + q)
-    p_dist = np.array([p_counts[char] / len(p) for char in all_chars])
-    q_dist = np.array([q_counts[char] / len(q) for char in all_chars])
+    
+    # Apply smoothing
+    p_dist = np.array([(p_counts[char] + smoothing_factor) / (len(p) + smoothing_factor * len(all_chars)) for char in all_chars])
+    q_dist = np.array([(q_counts[char] + smoothing_factor) / (len(q) + smoothing_factor * len(all_chars)) for char in all_chars])
+    
     return kl_divergence(p_dist, q_dist)
 
 def mutual_information(message1, message2):
@@ -178,7 +181,7 @@ def plot_results(entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noi
     plt.show()
 
 def main():
-    iterations = 100
+    iterations = 1000
     entropy_info, entropy_noise, kl_info, kl_noise, mi_info, mi_noise, cse_info, cse_noise = simulate_entropy_measurements_khan(iterations)
 
     avg_entropy_info = np.mean([x[1] - x[0] for x in entropy_info])
