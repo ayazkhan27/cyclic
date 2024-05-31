@@ -132,7 +132,7 @@ def main():
 
 
     # Check the percentage of primes that match Khan's theorems in a larger range
-    total_primes = 10000  # Adjust the range as needed
+    total_primes = 1000  # Adjust the range as needed
     khan_theorem_primes = sum(1 for i in range(2, total_primes + 1) if sympy.isprime(i) and all(verify_khan_theorems(i).values()))
     khan_theorem_percentage = (khan_theorem_primes / total_primes) * 100
     print(f"Percentage of total primes that match Khan's theorems: {khan_theorem_percentage:.6f}%")

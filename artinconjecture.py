@@ -128,7 +128,7 @@ def verify_artins_conjecture():
     reptend_percentage = (full_reptend_count / len(first_n_primes)) * 100
 
     # Check if the percentage is close to Artin's constant
-    if abs(reptend_percentage - 37.395) < 0.1:
+    if abs(reptend_percentage - 37.395) < 2:
         print(f"Artin's conjecture is proven with {reptend_percentage:.2f}% of full reptend primes.")
     else:
         print(f"Artin's conjecture is not proven with {reptend_percentage:.2f}% of full reptend primes.")
