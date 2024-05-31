@@ -70,10 +70,10 @@ def measure_khan_encryption(plaintext, start_position, superposition_sequence_le
     return ciphertext, decrypted_text
 
 def calculate_security_bits(prime, plaintext_length, start_position_range, superposition_length_range):
-    total_possible_states_log2 = np.log2(prime) + np.log2(superposition_length_range // 2)
-    total_permutations_log2 = total_possible_states_log2 * plaintext_length
-    security_bits = total_permutations_log2 - plaintext_length
-    return security_bits
+    key_space = prime * (superposition_length_range // 2)  # key space size
+    security_bits = np.log2(key_space) * plaintext_length  # estimate security in bits
+    return security_bits - plaintext_length  # adjust by plaintext length
+
 
 def main():
     global cyclic_prime
