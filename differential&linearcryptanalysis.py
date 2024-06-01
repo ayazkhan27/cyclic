@@ -50,8 +50,8 @@ def linear_cryptanalysis(plaintexts, ciphertexts):
 
 # Example use
 cyclic_prime = 1051
-start_position = 123
-superposition_sequence_length = 232
+start_position = 173
+superposition_sequence_length = 13246
 
 # Generate cyclic sequence
 cyclic_sequence = generate_cyclic_sequence(cyclic_prime, cyclic_prime - 1)
