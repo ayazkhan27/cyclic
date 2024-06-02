@@ -23,7 +23,7 @@ def generate_full_reptend_primes(max_bit_size):
                 break
     return full_reptend_primes
 
-max_bit_size = 20  # Maximum bit size to consider
+max_bit_size = 16  # Maximum bit size to consider
 full_reptend_primes = generate_full_reptend_primes(max_bit_size)
 print("Full Reptend Primes:")
 for bit_size, prime in full_reptend_primes.items():

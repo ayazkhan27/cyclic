@@ -1,6 +1,7 @@
 import random
 import string
-from decimal import Decimal
+from decimal import Decimal, getcontext
+import math
 import khan_encryption
 
 def generate_cyclic_sequence(prime, length):
@@ -13,12 +14,13 @@ def calculate_entropy(ciphertext):
     entropy = Decimal(0)
     for char, frequency in frequency_dict.items():
         probability = Decimal(frequency) / total_chars
-        entropy -= probability * probability.log10()
+        # Using log base 2 for Shannon entropy
+        entropy -= probability * Decimal(math.log2(probability))
     return entropy
 
 def test_confusion_and_diffusion():
-    prime = 1051  # Example prime number
-    sequence_length = 2325326  # Example sequence length
+    prime = 32779  # Example prime number
+    sequence_length = 2742  # Example sequence length
     plaintext_length = 128
     
     # Generate a cyclic sequence for testing
