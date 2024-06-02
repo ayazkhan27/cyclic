@@ -104,7 +104,7 @@ def main():
 
     # Generate a hypothetical keyspace for simulation
     keyspace = []
-    for _ in range(1000):  # Reduced keyspace for simulation
+    for _ in range(10000):  # Reduced keyspace for simulation
         possible_key = {
             'char_to_movement': char_to_movement,
             'movement_to_char': movement_to_char,
@@ -117,7 +117,7 @@ def main():
         keyspace.append(possible_key)
 
     # Set a timeout for the attack simulation
-    timeout_seconds = 3600  # 1 hour timeout for demonstration purposes
+    timeout_seconds = 360  # 1 hour timeout for demonstration purposes
     with ThreadPoolExecutor() as executor:
         future = executor.submit(reduced_grovers_attack, ciphertext, keyspace, cyclic_prime, start_position, cyclic_sequence)
         try:

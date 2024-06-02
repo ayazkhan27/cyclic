@@ -7,7 +7,7 @@ import time
 
 # Import the khan_encryption module from the specific path
 module_name = "khan_encryption"
-file_path = "C:/Users/admin/Documents/GitHub/cyclic/khan_encryption.py"
+file_path = "C:/Users/admin/Documents/GitHub/cyclic/khan_encryption_2.py"
 
 spec = importlib.util.spec_from_file_location(module_name, file_path)
 ke = importlib.util.module_from_spec(spec)
