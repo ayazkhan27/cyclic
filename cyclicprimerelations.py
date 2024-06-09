@@ -90,7 +90,7 @@ def analyze_cyclic_prime(prime, cyclic_sequence):
     print(f"Cyclic Prime {prime}")
     print("Target Sequences:", target_sequences)
     print("Calculated Movements:", movements)
-    print("Superposition Movements:", superposition_movements)
+    print("Superposition Movement Magnitude:", superposition_movements)
     print("Net Overall Movement:", net_movement)
 
     # Visualization
