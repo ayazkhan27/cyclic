@@ -8,7 +8,7 @@ from decimal import Decimal, getcontext
 
 # Set the encryption file path directly in the script for IDLE
 # Uncomment the next line and update the path to your file if running in IDLE
-os.environ['ENCRYPTION_FILE_PATH'] = 'C:/Users/admin/Documents/GitHub/cyclic/khan_encryption_2.py'
+os.environ['ENCRYPTION_FILE_PATH'] = '/home/zephyr27/Documents/GitHub/cyclic/khan_encryption_2.py'
 
 # Get the encryption file path from the environment variable
 file_path = os.getenv('ENCRYPTION_FILE_PATH')
