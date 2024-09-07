@@ -7,7 +7,7 @@ from decimal import Decimal, getcontext
 
 # Import the khan_encryption_2 module from a specific path
 module_name = "khan_encryption_2"
-file_path = "C:/Users/admin/Documents/GitHub/cyclic/khan_encryption_2.py"
+file_path = "/home/zephyr27/Documents/GitHub/cyclic/khan_encryption_2.py"
 
 spec = importlib.util.spec_from_file_location(module_name, file_path)
 ke = importlib.util.module_from_spec(spec)

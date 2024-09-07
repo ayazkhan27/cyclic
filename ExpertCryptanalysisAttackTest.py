@@ -11,7 +11,7 @@ from sympy import symbols, Eq, solve
 
 # Import the khan_encryption_2 module
 module_name = "khan_encryption2.0"
-file_path = "C:/Users/admin/Documents/GitHub/cyclic/khan_encryption_2.py"
+file_path = "/home/zephyr27/Documents/GitHub/cyclic/khan_encryption_2.py"
 
 spec = importlib.util.spec_from_file_location(module_name, file_path)
 ke = importlib.util.module_from_spec(spec)
