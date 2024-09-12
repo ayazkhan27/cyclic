@@ -70,30 +70,20 @@ def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
     superposition_points = []
     start_sequence = cyclic_sequence[:group_length]
     
-    #print(f"Analyzing cyclic prime {prime} with start position {start_position}")
-    #print(f"Cyclic sequence: {cyclic_sequence[:50]}...")
-    
     for i, target_sequence in enumerate(target_sequences):
         min_movements = minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length)
         
         if len(min_movements) > 1:
-            #print(f"Superposition point found at fraction {i+1}/{prime}")
             superposition_points.append(i)
-            movements.append(min_movements[0])  # Choose one arbitrarily for now
+            movements.append(min_movements[0])
         else:
             movements.append(min_movements[0])
-        
-        #print(f"Fraction {i+1}/{prime}: Movement {movements[-1]}")
-    
-    #print(f"Total movements: {len(movements)}")
-    #print(f"Superposition points: {superposition_points}")
-    #print(f"Net movement: {sum(movements)}")
     
     return movements, superposition_points
 
 def generate_keypair(prime, cyclic_sequence):
     start_position = random.randint(1, prime - 1)
-    superposition_sequence_length = random.randint(1000, 40000) // 2 * 2  # Ensure even length
+    superposition_sequence_length = random.randint(1000, 40000) // 2 * 2
     superposition_sequence = [random.choice([-1, 1]) for _ in range(superposition_sequence_length)]
     
     public_key = (prime, cyclic_sequence)
@@ -125,7 +115,6 @@ def decrypt(ciphertext, public_key, private_key, encryption_start_position, supe
     
     for i, movement in enumerate(ciphertext):
         if i in superposition_points:
-            # This is a superposition point
             direction = superposition_sequence[superposition_index % len(superposition_sequence)]
             movement *= direction
             superposition_index += 1
@@ -135,11 +124,10 @@ def decrypt(ciphertext, public_key, private_key, encryption_start_position, supe
     
     return ''.join(plaintext)
 
-# Driver program
 if __name__ == "__main__":
     print("Running KHAN encryption...")
     
-    prime = 1051  # Full reptend prime
+    prime = 1051
     cyclic_sequence = generate_cyclic_sequence(prime, prime - 1)
     
     print("Generating public/private keypair...")
