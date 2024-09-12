@@ -52,7 +52,7 @@ def analyze_avalanche_effect(plaintext, cyclic_prime, cyclic_sequence, start_pos
             for j in range(min(len(original_ciphertext), len(modified_ciphertext))):
                 xor_result = original_ciphertext[j] ^ modified_ciphertext[j]
                 different_bits += bin(xor_result).count('1')
-                total_bits += 8
+                total_bits += xor_result.bit_length()
         
         return different_bits / total_bits if total_bits > 0 else 0
     except ValueError:

@@ -19,7 +19,7 @@ def generate_cyclic_sequence(prime, length):
 # Prize message encryption
 prime = 1051
 cyclic_sequence = generate_cyclic_sequence(prime, prime - 1)
-plaintext = "ayaz"
+plaintext = "Hello Reddit! The prize message is: 1051"
 start_position = 774
 superposition_sequence_length = 75672
 

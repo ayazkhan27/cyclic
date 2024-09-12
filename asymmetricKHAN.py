@@ -80,27 +80,11 @@ def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
     
     return movements
 
-def generate_keys(prime, cyclic_sequence, start_position):
-    movements = analyze_cyclic_prime(prime, cyclic_sequence, start_position)
-    
-    all_chars = ''.join(chr(i) for i in range(256))  # Include all possible byte values
-    
-    char_to_movement = {}
-    movement_to_char = {}
-    
-    for i, char in enumerate(all_chars):
-        movement = movements[i % len(movements)]
-        char_to_movement[char] = movement
-        movement_to_char[movement] = char
-    
-    # Ensure all possible movement values are covered
-    for movement in range(-prime, prime):
-        if movement not in movement_to_char:
-            char = chr((movement + 256) % 256)
-            movement_to_char[movement] = char
-            char_to_movement[char] = movement
-    
-    return char_to_movement, movement_to_char
+def generate_public_keys(prime, cyclic_sequence):
+    return prime, cyclic_sequence
+
+def generate_private_keys(superposition_sequence_length, start_position):
+    return superposition_sequence_length, start_position
 
 def generate_superposition_sequence(sequence_length):
     while True:
@@ -115,24 +99,54 @@ def assign_z_layer(movement, salt):
     hashed = sha256(f"{movement}{salt}".encode()).hexdigest()
     return (int(hashed, 16) % 10) + 1
 
-def khan_encrypt(plaintext, prime, cyclic_sequence, start_position, superposition_sequence_length):
+def generate_keys(prime, cyclic_sequence, start_position):
+    movements = analyze_cyclic_prime(prime, cyclic_sequence, start_position)
+    
+    all_chars = ''.join(chr(i) for i in range(32, 127))
+    
+    char_to_movement = {}
+    movement_to_char = {}
+    used_movements = set()
+    
+    for i, char in enumerate(all_chars):
+        if i < len(movements):
+            movement = movements[i]
+        else:
+            movement = (i - len(movements)) * prime
+        if movement not in used_movements:
+            char_to_movement[char] = movement
+            movement_to_char[movement] = char
+            used_movements.add(movement)
+    
+    return char_to_movement, movement_to_char
+
+def khan_encrypt(plaintext, public_key):
+    prime, cyclic_sequence = public_key
+
+    # Generate keys without using private key
+    char_to_movement, movement_to_char = generate_keys(prime, cyclic_sequence, 0)
+    
+    # Generate superposition sequence and z-value (used only for private key)
+    superposition_sequence_length = 0  # Placeholder value, will not be used in encryption
+    start_position = 0  # Placeholder value, will not be used in encryption
+    superposition_sequence = generate_superposition_sequence(0)
+    z_value = calculate_z_value(superposition_sequence)
+    
+    iv = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+    salt = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+    
+    combined_text = iv + salt + plaintext
+    ciphertext, z_layers = encrypt_message(combined_text, char_to_movement, z_value, superposition_sequence, salt, prime)
+    return ciphertext, iv, salt, z_layers
+
+def khan_decrypt(ciphertext, public_key, private_key, iv, salt, z_layers):
+    prime, cyclic_sequence = public_key
+    superposition_sequence_length, start_position = private_key
+    
+    # Generate keys for decryption
     char_to_movement, movement_to_char = generate_keys(prime, cyclic_sequence, start_position)
     superposition_sequence = generate_superposition_sequence(superposition_sequence_length)
     z_value = calculate_z_value(superposition_sequence)
-    
-    iv = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))  # Generate 8-byte IV
-    salt = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))  # 8-byte salt
-    
-    # Combine IV and salt with the plaintext
-    combined_text = iv + salt + plaintext
-    ciphertext, z_layers = encrypt_message(combined_text, char_to_movement, z_value, superposition_sequence, salt, prime)
-    assert len(ciphertext) == len(z_layers), "Ciphertext and z_layers length mismatch during encryption"
-
-    return ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers
-
-def khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence):
-
-    cyclic_sequence = cyclic_sequence[start_position:] + cyclic_sequence[:start_position]
     
     combined_text = decrypt_message(ciphertext, movement_to_char, z_value, superposition_sequence, z_layers, salt, prime)
     plaintext = combined_text[len(iv) + len(salt):]
@@ -143,19 +157,20 @@ def encrypt_message(plaintext, char_to_movement, z_value, superposition_sequence
     z_layers = []
     superposition_sequence_copy = superposition_sequence.copy()
     for char in plaintext:
-        movement = char_to_movement.get(char, 0)  # Default to 0 if char not found
-        z_layer = assign_z_layer(movement, salt)
-        z_layers.append(z_layer)
-        if abs(movement) == (prime - 1) // 2:
-            movement = superposition_sequence_copy.pop(0)
-            superposition_sequence_copy.append(-movement)
-        cipher_text.append(movement * z_layer + z_value * prime)
+        movement = char_to_movement.get(char, None)
+        if movement is not None:
+            z_layer = assign_z_layer(movement, salt)
+            z_layers.append(z_layer)
+            if abs(movement) == (prime - 1) // 2:
+                movement = superposition_sequence_copy.pop(0)
+                superposition_sequence_copy.append(-movement)
+            cipher_text.append(movement * z_layer + z_value * prime)
+        else:
+            raise ValueError(f"Character {char} not in dictionary")
     
     return cipher_text, z_layers
 
 def decrypt_message(cipher_text, movement_to_char, z_value, superposition_sequence, z_layers, salt, prime):
-    assert len(cipher_text) == len(z_layers), "Ciphertext and z_layers length mismatch"
-    
     plain_text = []
     superposition_sequence_copy = superposition_sequence.copy()
     for i, movement in enumerate(cipher_text):
@@ -164,32 +179,9 @@ def decrypt_message(cipher_text, movement_to_char, z_value, superposition_sequen
         if abs(original_movement) == (prime - 1) // 2:
             original_movement = superposition_sequence_copy.pop(0)
             superposition_sequence_copy.append(-original_movement)
-        char = movement_to_char.get(original_movement, chr(original_movement % 256))  # Default to ASCII value if not found
-        plain_text.append(char)
+        char = movement_to_char.get(original_movement, None)
+        if char is not None:
+            plain_text.append(char)
+        else:
+            raise ValueError(f"Movement {original_movement} not in dictionary")
     return ''.join(plain_text)
-
-
-def brute_force_attack(ciphertext, possible_movements, movement_to_char):
-    for perm in permutations(possible_movements, len(ciphertext)):
-        plaintext = []
-        try:
-            for i, c in enumerate(ciphertext):
-                if c == perm[i]:
-                    plaintext.append(movement_to_char[perm[i]])
-                else:
-                    raise ValueError
-            return ''.join(plaintext)
-        except ValueError:
-            continue
-    return None
-
-def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
-    results = []
-    for pt in plaintexts:
-        result = khan_encrypt(pt, prime, cyclic_sequence, start_position)
-        results.append(result)
-    return results
-
-def known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
-    decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
-    return decrypted_text == plaintext
