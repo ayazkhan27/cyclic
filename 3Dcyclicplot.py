@@ -83,20 +83,27 @@ def analyze_cyclic_prime(prime, cyclic_sequence):
         movement = minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length, cyclic_sequence)
         movements.append(movement)
 
-    # Dynamically set the superposition movement
+    # Dynamically find superposition movement
     superposition_movement = (prime - 1) // 2
-    superposition_index = len(movements) - 1
-    movements[superposition_index] = superposition_movement  # Start with positive superposition movement
+    superposition_indices = [i for i, m in enumerate(movements) if abs(m) == superposition_movement]
 
     # Print movements before calculating net overall movement
     print(f"Cyclic Prime {prime}")
     print("Target Sequences:", target_sequences)
     print("Calculated Movements:", movements)
 
-    # Calculate net overall movement excluding the superposition movement
-    net_movement = sum(movements[:-1])
+    # Mark and display the superposition movements
+    print(f"Superposition Movements Detected at Indices: {superposition_indices}")
+    for idx in superposition_indices:
+        print(f"Superposition Movement at Index {idx}: {movements[idx]}")
 
-    print("Superposition Movements:", [superposition_movement, -superposition_movement])
+    # Calculate the superposition sequence length
+    superposition_sequence_length = len(superposition_indices)
+    print(f"Superposition Sequence Length: {superposition_sequence_length}")
+
+    # Calculate net overall movement excluding the superposition movement
+    net_movement = sum(m for i, m in enumerate(movements) if i not in superposition_indices)
+
     print("Net Overall Movement (excluding superposition):", net_movement)
 
     # 3D Visualization
@@ -115,10 +122,8 @@ def analyze_cyclic_prime(prime, cyclic_sequence):
             x_vals.append((i * prime) + n)
             y_vals.append(m)
             z_vals.append(z)
-            if m == superposition_movement:
-                colors.append('green' if superposition_movement > 0 else 'yellow')
-            elif m == -superposition_movement:
-                colors.append('yellow' if superposition_movement > 0 else 'green')
+            if idx in superposition_indices:
+                colors.append('green' if m > 0 else 'yellow')
             else:
                 colors.append('blue')
         
@@ -129,7 +134,8 @@ def analyze_cyclic_prime(prime, cyclic_sequence):
         colors.append('blue')
 
         # Alternate superposition movement for next level
-        movements[superposition_index] = -movements[superposition_index]
+        for idx in superposition_indices:
+            movements[idx] = -movements[idx]
 
     ax.plot(x_vals, y_vals, z_vals, color='blue')
     for x, y, z, c in zip(x_vals, y_vals, z_vals, colors):

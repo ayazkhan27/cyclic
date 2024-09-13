@@ -5,7 +5,6 @@ import math
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Hash import SHA256
-from eciespy import generate_eth_key, encrypt as ecc_encrypt, decrypt as ecc_decrypt
 import numpy as np
 
 # Import your KHAN encryption functions here
@@ -13,18 +12,18 @@ from asymmetricdemo import generate_keypair, encrypt, decrypt, generate_cyclic_s
 
 # Helper functions
 def calculate_entropy(data):
+    if isinstance(data, str):
+        data = data.encode()
     _, counts = np.unique(list(data), return_counts=True)
     probabilities = counts / len(data)
     entropy = -sum(probabilities * np.log2(probabilities))
     return entropy
 
 def calculate_avalanche_effect(original, modified):
-    bit_changes = sum(bin(ord(a) ^ ord(b)).count('1') for a, b in zip(original, modified))
-    return bit_changes / (8 * len(original))
+    return sum(a != b for a, b in zip(original, modified)) / len(original)
 
 def calculate_propagation_ratio(original_cipher, modified_cipher):
-    bit_changes = sum(bin(int(a) ^ int(b)).count('1') for a, b in zip(original_cipher, modified_cipher))
-    return bit_changes / (8 * len(original_cipher))
+    return sum(a != b for a, b in zip(original_cipher, modified_cipher)) / len(original_cipher)
 
 # RSA functions
 def generate_rsa_keypair(key_size):
@@ -43,20 +42,13 @@ def rsa_decrypt(ciphertext, private_key):
     cipher = PKCS1_OAEP.new(key)
     return cipher.decrypt(ciphertext).decode()
 
-# ECC functions
-def generate_ecc_keypair():
-    private_key = generate_eth_key()
-    public_key = private_key.public_key
-    return public_key.to_hex(), private_key.to_hex()
-
 # Comparison function
-def compare_algorithms(message, key_size):
+def compare_algorithms(message, rsa_key_size, khan_prime):
     results = {}
 
     # KHAN Encryption
-    prime = key_size  # Assuming prime is equivalent to key size for KHAN
-    cyclic_sequence = generate_cyclic_sequence(prime, prime - 1)
-    khan_public_key, khan_private_key = generate_keypair(prime, cyclic_sequence)
+    cyclic_sequence = generate_cyclic_sequence(khan_prime, khan_prime - 1)
+    khan_public_key, khan_private_key = generate_keypair(khan_prime, cyclic_sequence)
 
     start_time = time.time()
     khan_cipher, temp_start, superposition_points = encrypt(message, khan_public_key)
@@ -67,10 +59,10 @@ def compare_algorithms(message, key_size):
     khan_decrypt_time = time.time() - start_time
 
     khan_entropy = calculate_entropy(''.join(map(str, khan_cipher)))
-    khan_keyspace = prime * (2 ** len(khan_private_key[1]))  # Estimate based on prime and superposition sequence
+    khan_keyspace = khan_prime * (2 ** len(khan_private_key[1]))  # Estimate based on prime and superposition sequence
 
     # RSA
-    rsa_public_key, rsa_private_key = generate_rsa_keypair(key_size)
+    rsa_public_key, rsa_private_key = generate_rsa_keypair(rsa_key_size)
 
     start_time = time.time()
     rsa_cipher = rsa_encrypt(message, rsa_public_key)
@@ -81,36 +73,18 @@ def compare_algorithms(message, key_size):
     rsa_decrypt_time = time.time() - start_time
 
     rsa_entropy = calculate_entropy(rsa_cipher)
-    rsa_keyspace = 2 ** key_size
-
-    # ECC
-    ecc_public_key, ecc_private_key = generate_ecc_keypair()
-
-    start_time = time.time()
-    ecc_cipher = ecc_encrypt(ecc_public_key, message.encode())
-    ecc_encrypt_time = time.time() - start_time
-
-    start_time = time.time()
-    ecc_decrypted = ecc_decrypt(ecc_private_key, ecc_cipher).decode()
-    ecc_decrypt_time = time.time() - start_time
-
-    ecc_entropy = calculate_entropy(ecc_cipher)
-    ecc_keyspace = 2 ** (key_size // 2)  # ECC key size is typically half of RSA for equivalent security
+    rsa_keyspace = 2 ** rsa_key_size
 
     # Calculate avalanche effect and propagation ratio
     modified_message = message[:len(message)//2] + 'X' + message[len(message)//2+1:]
 
     khan_mod_cipher, _, _ = encrypt(modified_message, khan_public_key)
-    khan_avalanche = calculate_avalanche_effect(message, modified_message)
-    khan_propagation = calculate_propagation_ratio(khan_cipher, khan_mod_cipher)
+    khan_avalanche = calculate_avalanche_effect(str(khan_cipher), str(khan_mod_cipher))
+    khan_propagation = calculate_propagation_ratio(str(khan_cipher), str(khan_mod_cipher))
 
     rsa_mod_cipher = rsa_encrypt(modified_message, rsa_public_key)
-    rsa_avalanche = calculate_avalanche_effect(message, modified_message)
+    rsa_avalanche = calculate_avalanche_effect(rsa_cipher, rsa_mod_cipher)
     rsa_propagation = calculate_propagation_ratio(rsa_cipher, rsa_mod_cipher)
-
-    ecc_mod_cipher = ecc_encrypt(ecc_public_key, modified_message.encode())
-    ecc_avalanche = calculate_avalanche_effect(message, modified_message)
-    ecc_propagation = calculate_propagation_ratio(ecc_cipher, ecc_mod_cipher)
 
     results['KHAN'] = {
         'encrypt_time': khan_encrypt_time,
@@ -129,17 +103,7 @@ def compare_algorithms(message, key_size):
         'keyspace': rsa_keyspace,
         'avalanche': rsa_avalanche,
         'propagation': rsa_propagation,
-        'security_bits': key_size
-    }
-
-    results['ECC'] = {
-        'encrypt_time': ecc_encrypt_time,
-        'decrypt_time': ecc_decrypt_time,
-        'entropy': ecc_entropy,
-        'keyspace': ecc_keyspace,
-        'avalanche': ecc_avalanche,
-        'propagation': ecc_propagation,
-        'security_bits': key_size // 2
+        'security_bits': rsa_key_size
     }
 
     return results
@@ -147,11 +111,12 @@ def compare_algorithms(message, key_size):
 # Main execution
 if __name__ == "__main__":
     message = "This is a test message for comparing asymmetric encryption algorithms."
-    key_size = 2048  # Adjust as needed, ensuring it's a valid key size for all algorithms
+    rsa_key_size = 1024
+    khan_prime = 1051  # Adjust this to a suitable full reptend prime
 
-    results = compare_algorithms(message, key_size)
+    results = compare_algorithms(message, rsa_key_size, khan_prime)
 
-    print(f"Comparison Results (Key Size: {key_size} bits)")
+    print(f"Comparison Results (RSA Key Size: {rsa_key_size} bits, KHAN Prime: {khan_prime})")
     print("-" * 50)
     for algo, metrics in results.items():
         print(f"{algo}:")
