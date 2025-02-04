@@ -35,7 +35,7 @@ def generate_full_reptend_primes_and_sequences(key_sizes):
     return full_reptend_primes
 
 # Specify the key sizes
-key_sizes = [2, 4, 8, 16, 32, 64]
+key_sizes = [2, 4, 8, 16, 32, 64, 1024]
 
 # Generate full reptend primes and their respective cyclic sequences for specified key sizes
 full_reptend_primes = generate_full_reptend_primes_and_sequences(key_sizes)

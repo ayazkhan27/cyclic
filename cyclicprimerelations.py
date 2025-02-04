@@ -135,8 +135,18 @@ def analyze_cyclic_prime(prime, cyclic_sequence):
 
     plt.show()
 
-# Analyzing cyclic primes
-analyze_cyclic_prime(7, '142857')
-analyze_cyclic_prime(17, '0588235294117647')
-analyze_cyclic_prime(19, '052631578947368421')
-analyze_cyclic_prime(23, '0434782608695652173913')
+def run_tests():
+    primes = [7, 17, 19, 23]
+    cyclic_sequences = [
+        '142857',  # Cyclic sequence for 7
+        '0588235294117647',  # Cyclic sequence for 17
+        '052631578947368421',  # Cyclic sequence for 19
+        '0434782608695652173913'  # Cyclic sequence for 23
+    ]
+    
+    for prime, cyclic_sequence in zip(primes, cyclic_sequences):
+        print(f"Running tests for cyclic prime: {prime}")
+        analyze_cyclic_prime(prime, cyclic_sequence)
+
+# Run the tests
+run_tests()

@@ -68,7 +68,7 @@ def run_nist_tests(ciphertext):
 # Example use
 cyclic_prime = 1051
 start_position = 751
-superposition_sequence_length = 9866
+superposition_sequence_length = 78662
 
 # Generate cyclic sequence
 cyclic_sequence = generate_cyclic_sequence(cyclic_prime, cyclic_prime - 1)

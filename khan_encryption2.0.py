@@ -166,28 +166,3 @@ def decrypt_message(cipher_text, movement_to_char, z_value, superposition_sequen
         else:
             raise ValueError(f"Movement {original_movement} not in dictionary")
     return ''.join(plain_text)
-
-def brute_force_attack(ciphertext, possible_movements, movement_to_char):
-    for perm in permutations(possible_movements, len(ciphertext)):
-        plaintext = []
-        try:
-            for i, c in enumerate(ciphertext):
-                if c == perm[i]:
-                    plaintext.append(movement_to_char[perm[i]])
-                else:
-                    raise ValueError
-            return ''.join(plaintext)
-        except ValueError:
-            continue
-    return None
-
-def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
-    results = []
-    for pt in plaintexts:
-        result = khan_encrypt(pt, prime, cyclic_sequence, start_position)
-        results.append(result)
-    return results
-
-def known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
-    decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
-    return decrypted_text == plaintext
