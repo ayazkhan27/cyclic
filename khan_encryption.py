@@ -2,6 +2,7 @@ import random
 import string
 from hashlib import sha256
 from decimal import Decimal, getcontext
+from itertools import permutations
 
 def generate_plaintext(length):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
@@ -189,6 +190,6 @@ def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
         results.append(result)
     return results
 
-def known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
+def known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
     decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
     return decrypted_text == plaintext

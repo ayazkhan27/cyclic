@@ -34,7 +34,7 @@ class FRPBeacon:
         self.p = prime_p
         self.base=base
         self.remainder = offset % prime_p
-        # assert is_full_reptend_prime(prime_p, base), \"p not FRP\"
+        # assert is_full_reptend_prime(prime_p, base), "p not FRP"
 
     def next_val(self):
         self.remainder=(self.remainder*self.base)%self.p
@@ -108,7 +108,7 @@ if __name__=='__main__':
     p=65537
     base=10
     is_frp=is_full_reptend_prime(p, base)
-    print(f\"Prime={p}, base={base}, is_full_reptend? {is_frp}\")
+    print(f"Prime={p}, base={base}, is_full_reptend? {is_frp}")
     
     # Initialize FRP beacon
     beacon=FRPBeacon(p, base=base, offset=1)
@@ -122,8 +122,8 @@ if __name__=='__main__':
     frp_cov=coverage_report(frp_instrs)
     rand_cov=coverage_report(rand_instrs)
 
-    print(f\"FRP Coverage (200 vectors): {frp_cov}\")
-    print(f\"Random Coverage (200 vectors): {rand_cov}\")
+    print(f"FRP Coverage (200 vectors): {frp_cov}")
+    print(f"Random Coverage (200 vectors): {rand_cov}")
 
     # Possibly repeat with bigger sets
     bigger=1000
@@ -133,5 +133,5 @@ if __name__=='__main__':
     frp_cov2=coverage_report(frp_instrs2)
     rand_cov2=coverage_report(rand_instrs2)
 
-    print(f\"\\nFRP Coverage (1000 vectors): {frp_cov2}\")
-    print(f\"Random Coverage (1000 vectors): {rand_cov2}\")
+    print(f"\nFRP Coverage (1000 vectors): {frp_cov2}")
+    print(f"Random Coverage (1000 vectors): {rand_cov2}")
