@@ -66,7 +66,7 @@ def test_chosen_plaintext(char_to_movement, z_value, superposition_sequence):
     return True
 
 def test_known_plaintext(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, iv, salt, z_layers):
-    is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, user1_start_position, cyclic_sequence)
+    is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, user1_start_position, cyclic_sequence)
     if is_decrypted:
         print("Known Plaintext Attack: Passed")
     else:
