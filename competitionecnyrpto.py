@@ -210,7 +210,7 @@ def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
         results.append(result)
     return results
 
-def known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
+def known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
     decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
     return decrypted_text == plaintext
 
@@ -275,7 +275,7 @@ def known_plaintext_worker(q, timeout):
     result = True
     while time.time() - start_time < timeout:
         try:
-            is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
+            is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
             if is_decrypted:
                 result = False
                 break

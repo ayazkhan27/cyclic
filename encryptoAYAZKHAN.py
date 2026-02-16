@@ -119,7 +119,7 @@ def run_security_tests(ciphertext, possible_movements, char_to_movement, movemen
         result = True
         while time.time() - start_time < 240:
             try:
-                is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
+                is_decrypted = ke.known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
                 if is_decrypted:
                     result = False
                     break

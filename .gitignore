@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Sensitive / generated files
+*.pem
+*.key
+*.enc
+*.dec
+*.bin
+*.log
+test_log.txt
+decrypted_text.txt
+plain_text.txt
+encrypted_data.json
+encrypted_data.json.key
+secretfile
+secretfile.*
+
+# R history
+.Rhistory

@@ -198,7 +198,7 @@ def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
         results.append(result)
     return results
 
-def known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
+def known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
     decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
     return decrypted_text == plaintext
 
@@ -254,7 +254,7 @@ print(f"Chosen Plaintext Attack Ciphertexts: {chosen_ciphertexts}")
 # Simulate known plaintext attack
 plaintext = "KnownPlaintext"
 ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers = khan_encrypt_func(plaintext)
-is_decrypted = known_plaintext_attack(plaintext, ciphertext, char_to_movement, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
+is_decrypted = known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, cyclic_prime, iv, salt, z_layers, start_position, cyclic_sequence)
 print(f"Known Plaintext Attack Successful: {is_decrypted}")
 
 # Simulate brute force attack
