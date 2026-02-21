@@ -18,7 +18,8 @@ setup(
     ext_modules=[ckhan_ext],
     python_requires='>=3.8',
     install_requires=[
-        'cryptography>=41.0.0'
+        'cryptography>=41.0.0',
+        'sympy>=1.12'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
