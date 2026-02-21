@@ -12,7 +12,7 @@ from hashlib import sha256
 
 # Optional C++ extension import
 try:
-    from .ckhan import bulk_xor
+    from .ckhan import bulk_xor  # type: ignore[import-untyped]
 except ImportError:
     bulk_xor = None
 

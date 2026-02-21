@@ -9,27 +9,32 @@ def main():
     # entropy stream cipher
     print("Parsing NIST SP 800-22 Results...")
     if not os.path.exists(report_path):
-        print("[i] Notice: finalAnalysisReport.txt not found. "
-              "Using pre-computed verified scores for CI pipeline display.")
+        print(f"[i] Notice: {report_path} not found. Ensure you ran the NIST STS suite against khan_1GB.bin.")
+        print("[i] Exiting parser.")
+        return
 
-    tests = [
-        "Frequency",
-        "BlockFrequency",
-        "CumulativeSums",
-        "Runs",
-        "LongestRun",
-        "Rank",
-        "FFT",
-        "NonOverlappingTemplate",
-        "OverlappingTemplate",
-        "Universal",
-        "ApproximateEntropy",
-        "RandomExcursions",
-        "RandomExcursionsVariant",
-        "Serial",
-        "LinearComplexity"]
-    p_values = [0.912, 0.834, 0.765, 0.543, 0.982, 0.432, 0.887,
-                0.923, 0.567, 0.723, 0.834, 0.654, 0.443, 0.821, 0.799]
+    # Parse actual NIST finalAnalysisReport.txt
+    tests = []
+    p_values = []
+    with open(report_path, 'r') as f:
+        lines = f.readlines()
+        
+    for line in lines:
+        if line.startswith("-") or line.startswith(" ") or "P-VALUE" in line or not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) >= 12:
+            try:
+                p_val = float(parts[-2])
+                test_name = parts[-1]
+                tests.append(test_name)
+                p_values.append(p_val)
+            except ValueError:
+                continue
+
+    if not tests:
+        print("[-] Failed to parse any tests from the report.")
+        return
 
     df = pd.DataFrame({'NIST Test Suite': tests, 'P-Value': p_values})
 
