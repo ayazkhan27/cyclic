@@ -2,7 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from khan_cipher.core import encrypt
+from khan_cipher.core import KhanKeystream, derive_key
 
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({'font.family': 'serif', 'font.size': 12})
@@ -11,12 +11,14 @@ plt.rcParams.update({'font.family': 'serif', 'font.size': 12})
 def main():
     os.makedirs('benchmarks/plots', exist_ok=True)
 
-    # Generate keystream 256*256 = 65536 bytes
+    # Generate keystream 256*256 = 65536 bytes directly
     size = 256 * 256
     master_key = os.urandom(32)
-    plaintext = b'\x00' * size
-    payload = encrypt(plaintext, master_key)
-    keystream = payload[32:-32]
+    salt = os.urandom(16)
+    iv = os.urandom(16)
+    derived_key = derive_key(master_key, salt)
+    ksg = KhanKeystream(derived_key, 100003, iv)
+    keystream = bytes([ksg.get_next_byte() for _ in range(size)])
 
     signal = np.array(list(keystream), dtype=float)
     signal -= np.mean(signal)

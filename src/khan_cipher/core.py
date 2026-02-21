@@ -17,7 +17,7 @@ try:
 except ImportError:
     bulk_xor = None
 
-from .primes import DEFAULT_PRIME, generate_full_reptend_prime
+from .primes import DEFAULT_PRIME
 
 
 class KhanDecryptionError(Exception):
