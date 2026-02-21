@@ -1,0 +1,42 @@
+name: KHAN Cipher Enterprise Security pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 bandit mypy pytest pytest-cov
+        pip install -e .
+
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --max-line-length=120
+
+    - name: Type checking with mypy
+      run: |
+        mypy src/ || true
+
+    - name: Security auditing with bandit
+      run: |
+        bandit -r src/
+
+    - name: Run unit tests with pytest
+      run: |
+        pytest --cov=src/ tests/

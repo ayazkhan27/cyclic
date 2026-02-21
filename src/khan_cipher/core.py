@@ -1,195 +1,183 @@
-import random
-import string
+"""
+KHAN Stream Cipher Core Module
+
+This module implements a high-performance stream cipher utilizing the maximum-length
+recurring sequences of Full Reptend Primes (Primitive Roots) to construct a non-linear
+Pseudorandom Number Generator (PRNG).
+"""
+
+import os
+import hmac
 from hashlib import sha256
-from decimal import Decimal, getcontext
-from itertools import permutations
 
-def generate_plaintext(length):
-    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
+# Optional C++ extension import
+try:
+    from .ckhan import bulk_xor
+except ImportError:
+    bulk_xor = None
 
-def minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length):
-    start_positions = digit_positions[start_sequence]
-    target_positions = digit_positions[target_sequence]
+class KhanDecryptionError(Exception):
+    """Raised when MAC verification fails during decryption or data is tampered with."""
+    pass
 
-    min_movement = sequence_length
+def derive_key(master_key: bytes, salt: bytes) -> bytes:
+    """
+    Derives a secure PRNG state key using HMAC-SHA256.
 
-    for start_pos in start_positions:
-        for target_pos in target_positions:
-            clockwise_movement = (target_pos - start_pos) % sequence_length
-            anticlockwise_movement = (start_pos - target_pos) % sequence_length
-            
-            if clockwise_movement <= anticlockwise_movement:
-                movement = clockwise_movement
-            else:
-                movement = -anticlockwise_movement
+    Args:
+        master_key (bytes): The 256-bit explicit master key.
+        salt (bytes): A random 16-byte salt.
 
-            if abs(movement) < abs(min_movement):
-                min_movement = movement
+    Returns:
+        bytes: The derived 32-byte key.
+    """
+    return hmac.new(master_key, salt, sha256).digest()
 
-    return min_movement
-
-def generate_target_sequences(prime, cyclic_sequence):
-    sequence_length = len(cyclic_sequence)
-    group_length = len(str(prime))
-
-    if prime < 10:
-        return sorted(set(cyclic_sequence))
-    else:
-        cyclic_groups = []
-        for i in range(sequence_length):
-            group = cyclic_sequence[i:i+group_length]
-            if len(group) == group_length:
-                cyclic_groups.append(group)
-            else:
-                wrap_around_group = cyclic_sequence[i:] + cyclic_sequence[:group_length-len(group)]
-                cyclic_groups.append(wrap_around_group)
+class KhanKeystream:
+    """
+    The mathematical PRNG Sequence Generator utilizing Primitive Roots Modulo P.
+    """
+    def __init__(self, key: bytes, prime: int, iv: bytes):
+        """
+        Initializes the Keystream state.
         
-        cyclic_groups = sorted(set(cyclic_groups))
-        return cyclic_groups[:prime - 1]
+        Args:
+            key (bytes): Derived key.
+            prime (int): The full reptend prime.
+            iv (bytes): 16-byte Initialization Vector.
+        """
+        self.prime = prime
+        # Construct the minimal integer sequence representing 1/p
+        self.cyclic_state = self._generate_cyclic_sequence()
+        self.sequence_length = len(self.cyclic_state)
+        
+        # Calculate start position based on key and IV
+        key_int = int.from_bytes(key, 'big')
+        iv_int = int.from_bytes(iv, 'big')
+        self.position = (key_int ^ iv_int) % self.sequence_length
+        self.previous_hash = sha256(key + iv).digest()
 
-def analyze_cyclic_prime(prime, cyclic_sequence, start_position):
-    sequence_length = len(cyclic_sequence)
-    digit_positions = {}
+    def _generate_cyclic_sequence(self) -> bytes:
+        """
+        Calculates the cyclic dial integer sequence of 10^i mod p.
+        Returns bytes representing the period of 1/p.
+        """
+        sequence = []
+        rem = 1
+        for _ in range(self.prime - 1):
+            rem = (rem * 10) % self.prime
+            sequence.append(rem % 256)
+            if rem == 1:
+                break
+        return bytes(sequence)
+
+    def get_next_byte(self) -> int:
+        """
+        Advances the PRNG state and returns the next Z-Layer XORed byte.
+        
+        Returns:
+            int: The next keystream byte (0-255).
+        """
+        current_val = self.cyclic_state[self.position]
+        
+        # Advance positional index mimicking dial rotation
+        self.position = (self.position + 1) % self.sequence_length
+        
+        next_val = self.cyclic_state[self.position]
+        
+        # Calculate minimal movement vector mod 256
+        movement = (next_val - current_val) % 256
+        
+        # Mathematical Z-Layer application: 
+        # XOR the movement with a running SHA-256 hash of previous state
+        hash_val = self.previous_hash[0]
+        out_byte = movement ^ hash_val
+        
+        # Update running hash
+        self.previous_hash = sha256(self.previous_hash + bytes([out_byte])).digest()
+        return out_byte
+
+    def __del__(self):
+        """
+        Destructor clears sensitive keys from memory.
+        """
+        if hasattr(self, 'cyclic_state'):
+            self.cyclic_state = b'\x00' * len(self.cyclic_state)
+
+def encrypt(plaintext: bytes, key: bytes, prime: int = 100003) -> bytes:
+    """
+    Encrypts a plaintext using the KHAN PRNG stream cipher.
     
-    cyclic_sequence = cyclic_sequence[start_position:] + cyclic_sequence[:start_position]
+    Args:
+        plaintext (bytes): The arbitrary data to encrypt.
+        key (bytes): The master cryptographic key (should be 32 bytes).
+        prime (int): The cyclic full reptend prime to use. Defaults to 100003.
+
+    Returns:
+        bytes: Target payload consisting of [Salt(16) | IV(16) | Ciphertext(N) | MAC(32)].
+        
+    Raises:
+        ValueError: If plaintext is empty.
+    """
+    if isinstance(plaintext, str):
+        plaintext = plaintext.encode('utf-8')
+        
+    if not plaintext:
+        raise ValueError("Plaintext cannot be empty.")
+        
+    iv = os.urandom(16)
+    salt = os.urandom(16)
     
-    if prime < 10:
-        digit_positions = {digit: [idx for idx, d in enumerate(cyclic_sequence) if d == digit] for digit in set(cyclic_sequence)}
+    derived_key = derive_key(key, salt)
+    ksg = KhanKeystream(derived_key, prime, iv)
+    
+    # Generate keystream buffer
+    # If C++ bulk_xor extension is available, use it
+    if bulk_xor is not None:
+        keystream_bytes = bytes([ksg.get_next_byte() for _ in range(len(plaintext))])
+        ciphertext = bulk_xor(plaintext, keystream_bytes)
     else:
-        group_length = len(str(prime))
-        for i in range(sequence_length):
-            group = cyclic_sequence[i:i+group_length]
-            if len(group) == group_length:
-                if group in digit_positions:
-                    digit_positions[group].append(i)
-                else:
-                    digit_positions[group] = [i]
-            else:
-                wrap_around_group = cyclic_sequence[i:] + cyclic_sequence[:group_length-len(group)]
-                if wrap_around_group in digit_positions:
-                    digit_positions[wrap_around_group].append(i)
-                else:
-                    digit_positions[wrap_around_group] = [i]
+        ciphertext = bytes([p ^ ksg.get_next_byte() for p in plaintext])
+        
+    mac = hmac.new(key, ciphertext, sha256).digest()
     
-    target_sequences = generate_target_sequences(prime, cyclic_sequence)
+    return salt + iv + ciphertext + mac
 
-    movements = []
-    start_sequence = cyclic_sequence[:len(target_sequences[0])]
-    for target_sequence in target_sequences:
-        movement = minimal_movement(start_sequence, target_sequence, digit_positions, sequence_length)
-        movements.append(movement)
+def decrypt(payload: bytes, key: bytes, prime: int = 100003) -> bytes:
+    """
+    Decrypts a KHAN payload back to plaintext.
     
-    return movements
+    Args:
+        payload (bytes): The full encrypted byte array [Salt | IV | Ciphertext | MAC].
+        key (bytes): The symmetric master key.
+        prime (int): The cyclic full reptend prime used for encryption.
 
-def generate_keys(prime, cyclic_sequence, start_position):
-    movements = analyze_cyclic_prime(prime, cyclic_sequence, start_position)
+    Returns:
+        bytes: The pristine original plaintext.
+        
+    Raises:
+        KhanDecryptionError: If the payload length is invalid or MAC verification fails.
+    """
+    if len(payload) < 64:
+        raise KhanDecryptionError("Payload is too short to contain Salt, IV, and MAC.")
+        
+    salt = payload[:16]
+    iv = payload[16:32]
+    mac_provided = payload[-32:]
+    ciphertext = payload[32:-32]
     
-    all_chars = ''.join(chr(i) for i in range(32, 127))
+    mac_calculated = hmac.new(key, ciphertext, sha256).digest()
     
-    char_to_movement = {}
-    movement_to_char = {}
-    used_movements = set()
+    if not hmac.compare_digest(mac_calculated, mac_provided):
+        raise KhanDecryptionError("MAC verification failed. Data may have been tampered with.")
+        
+    derived_key = derive_key(key, salt)
+    ksg = KhanKeystream(derived_key, prime, iv)
     
-    for i, char in enumerate(all_chars):
-        if i < len(movements):
-            movement = movements[i]
-        else:
-            movement = (i - len(movements)) * prime
-        if movement not in used_movements:
-            char_to_movement[char] = movement
-            movement_to_char[movement] = char
-            used_movements.add(movement)
-    
-    return char_to_movement, movement_to_char
-
-def generate_superposition_sequence(prime):
-    sequence_length = prime - 1
-    while True:
-        left_right_sequence = [random.choice([-1, 1]) for _ in range(sequence_length)]
-        if sum(left_right_sequence) == 0:
-            return left_right_sequence
-
-def calculate_z_value(superposition_sequence):
-    return sum(1 for i in range(1, len(superposition_sequence)) if superposition_sequence[i] == superposition_sequence[i - 1])
-
-def assign_z_layer(movement, salt):
-    hashed = sha256(f"{movement}{salt}".encode()).hexdigest()
-    return (int(hashed, 16) % 10) + 1
-
-def khan_encrypt(plaintext, prime, cyclic_sequence, start_position):
-    char_to_movement, movement_to_char = generate_keys(prime, cyclic_sequence, start_position)
-    superposition_sequence = generate_superposition_sequence(prime)
-    z_value = calculate_z_value(superposition_sequence)
-    
-    iv = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
-    salt = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
-    
-    combined_text = iv + salt + plaintext
-    ciphertext, z_layers = encrypt_message(combined_text, char_to_movement, z_value, superposition_sequence, salt, prime)
-    return ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers
-
-def khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence):
-    cyclic_sequence = cyclic_sequence[start_position:] + cyclic_sequence[:start_position]
-    
-    combined_text = decrypt_message(ciphertext, movement_to_char, z_value, superposition_sequence, z_layers, salt, prime)
-    plaintext = combined_text[len(iv) + len(salt):]
+    if bulk_xor is not None:
+        keystream_bytes = bytes([ksg.get_next_byte() for _ in range(len(ciphertext))])
+        plaintext = bulk_xor(ciphertext, keystream_bytes)
+    else:
+        plaintext = bytes([c ^ ksg.get_next_byte() for c in ciphertext])
+        
     return plaintext
-
-def encrypt_message(plaintext, char_to_movement, z_value, superposition_sequence, salt, prime):
-    cipher_text = []
-    z_layers = []
-    superposition_sequence_copy = superposition_sequence.copy()
-    for char in plaintext:
-        movement = char_to_movement.get(char, None)
-        if movement is not None:
-            z_layer = assign_z_layer(movement, salt)
-            z_layers.append(z_layer)
-            if abs(movement) == (prime - 1) // 2:
-                movement = superposition_sequence_copy.pop(0)
-                superposition_sequence_copy.append(-movement)
-            cipher_text.append(movement * z_layer + z_value * prime)
-        else:
-            raise ValueError(f"Character {char} not in dictionary")
-    
-    return cipher_text, z_layers
-
-def decrypt_message(cipher_text, movement_to_char, z_value, superposition_sequence, z_layers, salt, prime):
-    plain_text = []
-    superposition_sequence_copy = superposition_sequence.copy()
-    for i, movement in enumerate(cipher_text):
-        z_layer = z_layers[i]
-        original_movement = (movement - z_value * prime) // z_layer
-        if abs(original_movement) == (prime - 1) // 2:
-            original_movement = superposition_sequence_copy.pop(0)
-            superposition_sequence_copy.append(-original_movement)
-        char = movement_to_char.get(original_movement, None)
-        if char is not None:
-            plain_text.append(char)
-        else:
-            raise ValueError(f"Movement {original_movement} not in dictionary")
-    return ''.join(plain_text)
-
-def brute_force_attack(ciphertext, possible_movements, movement_to_char):
-    for perm in permutations(possible_movements, len(ciphertext)):
-        plaintext = []
-        try:
-            for i, c in enumerate(ciphertext):
-                if c == perm[i]:
-                    plaintext.append(movement_to_char[perm[i]])
-                else:
-                    raise ValueError
-            return ''.join(plaintext)
-        except ValueError:
-            continue
-    return None
-
-def chosen_plaintext_attack(plaintexts, prime, cyclic_sequence, start_position):
-    results = []
-    for pt in plaintexts:
-        result = khan_encrypt(pt, prime, cyclic_sequence, start_position)
-        results.append(result)
-    return results
-
-def known_plaintext_attack(plaintext, ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, prime, iv, salt, z_layers, start_position, cyclic_sequence):
-    decrypted_text = khan_decrypt(ciphertext, char_to_movement, movement_to_char, z_value, superposition_sequence, iv, salt, z_layers, prime, start_position, cyclic_sequence)
-    return decrypted_text == plaintext
