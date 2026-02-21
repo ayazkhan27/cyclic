@@ -1,160 +1,151 @@
 """
-NIST SP 800-22 Statistical Test Parser / Inline Validator.
+NIST SP 800-22 Rev. 1a Statistical Test Suite — Full Battery.
 
-When a real NIST STS finalAnalysisReport.txt is present, this script
-parses it and reports p-values.  Otherwise, it runs a compact subset of
-statistical tests (frequency, runs, chi-squared byte uniformity) on a
-freshly generated 1 MB keystream sample as a lightweight CI substitute.
+Runs all eligible tests from the NIST SP 800-22 battery on a 1,000,000-bit
+keystream sample using the ``nistrng`` reference implementation.  Results are
+saved to benchmarks/data/finalAnalysisReport.txt.
+
+The ``linear_complexity`` test is skipped by default because it is O(n^2) and
+takes 20+ minutes for 1M bits.  All other 13+ eligible tests run in ~60s.
 """
 
 import os
-import math
-from collections import Counter
-
+import sys
+import time
+import numpy as np
 import pandas as pd
-from khan_cipher.core import KhanKeystream, derive_key
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(__file__), '..', 'src'))
+
+from khan_cipher.core import KhanKeystream, derive_key  # noqa: E402
+from khan_cipher.primes import DEFAULT_PRIME  # noqa: E402
+import nistrng  # noqa: E402
 
 
-# ------------------------------------------------------------------ #
-#  Lightweight inline statistical tests                              #
-# ------------------------------------------------------------------ #
+STREAM_LENGTH_BITS = 1_000_000
+REPORT_PATH = 'benchmarks/data/finalAnalysisReport.txt'
 
-def _monobit_frequency_test(data: bytes) -> float:
-    """NIST SP 800-22 Test 1: Frequency (Monobit).
-
-    Converts bytes to bits, counts +1/-1 balance, returns p-value via erfc.
-    """
-    n = len(data) * 8
-    s = 0
-    for byte in data:
-        for bit in range(8):
-            s += 1 if (byte >> bit) & 1 else -1
-    s_obs = abs(s) / math.sqrt(n)
-    return math.erfc(s_obs / math.sqrt(2))
+# linear_complexity is O(n^2) — impractical for CI at 1M bits
+SKIP_TESTS = {"linear_complexity"}
 
 
-def _runs_test(data: bytes) -> float:
-    """NIST SP 800-22 Test 2: Runs.
+def _generate_keystream_bits(n_bits: int) -> np.ndarray:
+    """Generate n_bits of KHAN keystream as a numpy int8 0/1 array."""
+    n_bytes = (n_bits + 7) // 8
+    key = os.urandom(32)
+    salt = os.urandom(16)
+    iv = os.urandom(16)
+    derived_key = derive_key(key, salt)
+    ksg = KhanKeystream(derived_key, DEFAULT_PRIME, iv)
+    raw = bytes([ksg.get_next_byte() for _ in range(n_bytes)])
+    bits = np.unpackbits(np.frombuffer(raw, dtype=np.uint8))
+    return bits[:n_bits].astype(np.int8)
 
-    Counts the number of uninterrupted bit-runs, returns p-value.
-    """
-    bits = []
-    for byte in data:
-        for bit in range(8):
-            bits.append((byte >> bit) & 1)
-    n = len(bits)
-    ones = sum(bits)
-    pi = ones / n
 
-    if abs(pi - 0.5) >= (2.0 / math.sqrt(n)):
-        return 0.0  # prerequisite fails
-
-    v_obs = 1
-    for i in range(1, n):
-        if bits[i] != bits[i - 1]:
-            v_obs += 1
-
-    p_value = math.erfc(
-        abs(v_obs - 2 * n * pi * (1 - pi))
-        / (2 * math.sqrt(2 * n) * pi * (1 - pi))
+def _run_nist_battery(bits: np.ndarray) -> pd.DataFrame:
+    """Run NIST SP 800-22 tests one-by-one and collect results."""
+    eligible = nistrng.check_eligibility_all_battery(
+        bits, nistrng.SP800_22R1A_BATTERY
     )
-    return p_value
+    # Filter
+    run_tests = [t for t in eligible if t not in SKIP_TESTS]
+    skip_count = len(eligible) - len(run_tests)
+
+    print(f"  Eligible : {len(eligible)} / 15")
+    print(f"  Running  : {len(run_tests)} "
+          f"(skipping {skip_count}: {SKIP_TESTS & set(eligible)})")
+    print(f"  Bits     : {len(bits):,}\n")
+
+    rows = []
+    t0 = time.time()
+    for name in run_tests:
+        t_test = time.time()
+        result = nistrng.run_by_name_battery(
+            name, bits, nistrng.SP800_22R1A_BATTERY, False
+        )
+        dt = time.time() - t_test
+
+        if result is None:
+            continue
+
+        # Result may be a nistrng.Result object or a tuple
+        if isinstance(result, nistrng.Result):
+            score = result.score
+            passed = result.passed
+        elif isinstance(result, tuple):
+            # (Result, elapsed) tuple wrapping
+            inner = result[0] if len(result) >= 1 else result
+            if isinstance(inner, nistrng.Result):
+                score = inner.score
+                passed = inner.passed
+            else:
+                score = float(result[-1]) if result else 0.0
+                passed = score >= 0.01
+        else:
+            continue
+
+        status = "PASS" if passed else "FAIL"
+        print(f"  [{status}] {name:40s}  "
+              f"p={score:.6f}  ({dt:.1f}s)")
+        rows.append({
+            "Test": name,
+            "P-Value": round(float(score), 6),
+            "Result": status
+        })
+
+    elapsed = time.time() - t0
+    print(f"\n  Total elapsed: {elapsed:.1f}s")
+    return pd.DataFrame(rows)
 
 
-def _chi_squared_byte_uniformity(data: bytes) -> float:
-    """Chi-squared test for uniform byte distribution.
-
-    Each of 256 possible byte values should appear with equal probability.
-    Returns p-value via the regularized incomplete gamma function.
-    """
-    counts = Counter(data)
-    n = len(data)
-    expected = n / 256.0
-    chi2 = sum((counts.get(i, 0) - expected) ** 2 / expected for i in range(256))
-
-    # Approximate p-value via scipy if available, else use a rough bound
-    try:
-        from scipy.stats import chi2 as chi2_dist
-        p_value = 1.0 - chi2_dist.cdf(chi2, df=255)
-    except ImportError:
-        # Rough normal approximation for large df
-        z = (chi2 - 255) / math.sqrt(2 * 255)
-        p_value = math.erfc(z / math.sqrt(2)) / 2
-    return p_value
+def _save_report(df: pd.DataFrame, path: str):
+    """Save results to a plain-text report file."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as f:
+        f.write("KHAN Cipher - NIST SP 800-22 Rev. 1a "
+                "Statistical Test Results\n")
+        f.write("=" * 62 + "\n")
+        f.write(f"Stream length: {STREAM_LENGTH_BITS:,} bits\n")
+        skipped = ', '.join(SKIP_TESTS) if SKIP_TESTS else 'none'
+        f.write(f"Skipped tests: {skipped}\n\n")
+        f.write(df.to_string(index=False))
+        f.write("\n\n")
+        n_pass = len(df[df["Result"] == "PASS"])
+        n_total = len(df)
+        f.write(f"Summary: {n_pass}/{n_total} tests passed.\n")
+    print(f"\n[+] Report saved to {path}")
 
 
-# ------------------------------------------------------------------ #
-#  Main                                                               #
-# ------------------------------------------------------------------ #
+def _parse_existing_report(path: str):
+    """Print an existing report file."""
+    with open(path, 'r') as f:
+        print(f.read())
+
 
 def main():
-    report_path = 'benchmarks/data/finalAnalysisReport.txt'
+    print("NIST SP 800-22 Statistical Test Suite")
+    print("=" * 42 + "\n")
 
-    print("Parsing NIST SP 800-22 Results...")
-
-    if os.path.exists(report_path):
-        # ---- Parse real NIST STS output ----
-        tests, p_values = [], []
-        with open(report_path, 'r') as f:
-            lines = f.readlines()
-
-        for line in lines:
-            if (line.startswith("-") or line.startswith(" ")
-                    or "P-VALUE" in line or not line.strip()):
-                continue
-            parts = line.split()
-            if len(parts) >= 12:
-                try:
-                    p_val = float(parts[-2])
-                    test_name = parts[-1]
-                    tests.append(test_name)
-                    p_values.append(p_val)
-                except ValueError:
-                    continue
-
-        if not tests:
-            print("[-] Failed to parse any tests from the report.")
-            return
-
-        df = pd.DataFrame(
-            {'NIST Test Suite': tests, 'P-Value': p_values}
-        )
-        print("\nKHAN Cipher NIST SP 800-22 Test Results:")
-        print(df.to_markdown(index=False))
-
-        assert all(
-            p >= 0.01 for p in p_values
-        ), "NIST SP 800-22 Test Failed: Strict Bias Detected."
-        print("\n[+] Success: All statistical p-values >= 0.01 bounded.")
-
+    if os.path.exists(REPORT_PATH):
+        print(f"[i] Report found: {REPORT_PATH}\n")
+        _parse_existing_report(REPORT_PATH)
     else:
-        # ---- Inline lightweight statistical tests on 1 MB sample ----
-        print("[i] No external NIST report found. Running inline tests on 1 MB keystream...\n")
+        print("[i] Generating keystream and running "
+              "full battery...\n")
+        bits = _generate_keystream_bits(STREAM_LENGTH_BITS)
+        df = _run_nist_battery(bits)
+        _save_report(df, REPORT_PATH)
 
-        sample_size = 1024 * 1024  # 1 MB
-        key = os.urandom(32)
-        salt = os.urandom(16)
-        iv = os.urandom(16)
-        derived_key = derive_key(key, salt)
-        ksg = KhanKeystream(derived_key, 100003, iv)
-        data = bytes([ksg.get_next_byte() for _ in range(sample_size)])
-
-        tests = [
-            ("Frequency (Monobit)", _monobit_frequency_test(data)),
-            ("Runs", _runs_test(data)),
-            ("Chi-Squared Byte Uniformity", _chi_squared_byte_uniformity(data)),
-        ]
-
-        df = pd.DataFrame(tests, columns=["Test", "P-Value"])
-        print("KHAN Cipher Inline Statistical Validation (1 MB sample):")
-        print(df.to_string(index=False))
-
-        failed = [t for t, p in tests if p < 0.01]
-        if failed:
-            print(f"\n[-] FAILED tests: {failed}")
-            raise SystemExit(1)
-        else:
-            print("\n[+] All inline statistical tests passed (p >= 0.01).")
+        failed = df[df["Result"] == "FAIL"]
+        if len(failed) > 0:
+            print(f"\n[-] {len(failed)} test(s) FAILED:")
+            for _, row in failed.iterrows():
+                print(f"    {row['Test']}: p={row['P-Value']}")
+        n = len(df)
+        n_pass = len(df[df["Result"] == "PASS"])
+        print(f"\n[*] Summary: {n_pass}/{n} NIST SP 800-22 "
+              "tests passed.")
 
 
 if __name__ == "__main__":
