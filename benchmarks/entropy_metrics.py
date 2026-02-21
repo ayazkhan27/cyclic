@@ -34,7 +34,8 @@ def main():
     # Encrypt
     payload = encrypt(plaintext, master_key)
     # The payload is [salt(16) | iv(16) | ciphertext | mac(32)]
-    # The keystream is equivalent to ciphertext because plaintext is all zeros (0 ^ K = K)
+    # The keystream is equivalent to ciphertext because plaintext is all zeros
+    # (0 ^ K = K)
     ciphertext = payload[32:-32]
 
     # 1. Rolling Entropy Plot
@@ -42,7 +43,7 @@ def main():
     entropies = []
 
     for i in range(0, len(ciphertext), chunk_size):
-        chunk = ciphertext[i:i+chunk_size]
+        chunk = ciphertext[i:i + chunk_size]
         if len(chunk) == chunk_size:
             entropies.append(calculate_shannon(chunk))
 
@@ -69,7 +70,7 @@ def main():
     plt.xlabel('Byte Value (0-255)')
     plt.ylabel('Frequency')
     plt.title('KHAN PRNG Output Byte Uniformity (1MB)')
-    plt.axhline(y=len(ciphertext)/256, color='r', linestyle='--',
+    plt.axhline(y=len(ciphertext) / 256, color='r', linestyle='--',
                 label='Ideal Uniform Distribution')
     plt.legend()
     plt.tight_layout()

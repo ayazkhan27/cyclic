@@ -1,9 +1,9 @@
 import os
 from khan_cipher.core import encrypt, decrypt
 
-print("="*50)
+print("=" * 50)
 print("KHAN CIPHER - ENTERPRISE DEMONSTRATION")
-print("="*50)
+print("=" * 50)
 
 master_key = os.urandom(32)
 print(f"Master Key (256-bit): {master_key.hex()}")

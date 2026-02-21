@@ -29,7 +29,7 @@ def main():
         lag_signal = signal[:2000]
         autocorr = np.correlate(lag_signal, lag_signal, mode='full')
         # Extract the positive lags
-        autocorr = autocorr[len(autocorr)//2: len(autocorr)//2 + max_lag]
+        autocorr = autocorr[len(autocorr) // 2: len(autocorr) // 2 + max_lag]
 
         plt.figure(figsize=(10, 5))
         plt.plot(range(max_lag), autocorr, color='green')

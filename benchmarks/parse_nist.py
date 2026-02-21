@@ -5,17 +5,29 @@ import os
 def main():
     report_path = 'benchmarks/data/finalAnalysisReport.txt'
 
-    # Generate dummy pass data representing a mathematically sound 7.99+ entropy stream cipher
+    # Generate dummy pass data representing a mathematically sound 7.99+
+    # entropy stream cipher
     print("Parsing NIST SP 800-22 Results...")
     if not os.path.exists(report_path):
         print("[i] Notice: finalAnalysisReport.txt not found. "
               "Using pre-computed verified scores for CI pipeline display.")
 
     tests = [
-        "Frequency", "BlockFrequency", "CumulativeSums", "Runs", "LongestRun",
-        "Rank", "FFT", "NonOverlappingTemplate", "OverlappingTemplate", "Universal",
-        "ApproximateEntropy", "RandomExcursions", "RandomExcursionsVariant", "Serial", "LinearComplexity"
-    ]
+        "Frequency",
+        "BlockFrequency",
+        "CumulativeSums",
+        "Runs",
+        "LongestRun",
+        "Rank",
+        "FFT",
+        "NonOverlappingTemplate",
+        "OverlappingTemplate",
+        "Universal",
+        "ApproximateEntropy",
+        "RandomExcursions",
+        "RandomExcursionsVariant",
+        "Serial",
+        "LinearComplexity"]
     p_values = [0.912, 0.834, 0.765, 0.543, 0.982, 0.432, 0.887,
                 0.923, 0.567, 0.723, 0.834, 0.654, 0.443, 0.821, 0.799]
 
