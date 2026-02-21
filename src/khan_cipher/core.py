@@ -36,73 +36,40 @@ def derive_key(master_key: bytes, salt: bytes) -> bytes:
 class KhanKeystream:
     """
     The mathematical PRNG Sequence Generator utilizing Primitive Roots Modulo P.
+    Generates state on-the-fly using O(1) memory discrete logarithm tracking.
     """
     def __init__(self, key: bytes, prime: int, iv: bytes):
-        """
-        Initializes the Keystream state.
-        
-        Args:
-            key (bytes): Derived key.
-            prime (int): The full reptend prime.
-            iv (bytes): 16-byte Initialization Vector.
-        """
         self.prime = prime
-        # Construct the minimal integer sequence representing 1/p
-        self.cyclic_state = self._generate_cyclic_sequence()
-        self.sequence_length = len(self.cyclic_state)
         
         # Calculate start position based on key and IV
         key_int = int.from_bytes(key, 'big')
         iv_int = int.from_bytes(iv, 'big')
-        self.position = (key_int ^ iv_int) % self.sequence_length
+        
+        # The sequence length of a full reptend prime is always p - 1
+        self.position = (key_int ^ iv_int) % (self.prime - 1)
+        
+        # O(1) On-the-fly state calculation: 10^position mod p
+        self.current_rem = pow(10, self.position, self.prime)
+        
         self.previous_hash = sha256(key + iv).digest()
 
-    def _generate_cyclic_sequence(self) -> bytes:
-        """
-        Calculates the cyclic dial integer sequence of 10^i mod p.
-        Returns bytes representing the period of 1/p.
-        """
-        sequence = []
-        rem = 1
-        for _ in range(self.prime - 1):
-            rem = (rem * 10) % self.prime
-            sequence.append(rem % 256)
-            if rem == 1:
-                break
-        return bytes(sequence)
-
     def get_next_byte(self) -> int:
-        """
-        Advances the PRNG state and returns the next Z-Layer XORed byte.
+        current_val = self.current_rem % 256
         
-        Returns:
-            int: The next keystream byte (0-255).
-        """
-        current_val = self.cyclic_state[self.position]
-        
-        # Advance positional index mimicking dial rotation
-        self.position = (self.position + 1) % self.sequence_length
-        
-        next_val = self.cyclic_state[self.position]
+        # Advance the dial by multiplying by 10 mod p (O(1) time complexity)
+        self.current_rem = (self.current_rem * 10) % self.prime
+        next_val = self.current_rem % 256
         
         # Calculate minimal movement vector mod 256
         movement = (next_val - current_val) % 256
         
-        # Mathematical Z-Layer application: 
-        # XOR the movement with a running SHA-256 hash of previous state
+        # Mathematical Z-Layer application
         hash_val = self.previous_hash[0]
         out_byte = movement ^ hash_val
         
         # Update running hash
         self.previous_hash = sha256(self.previous_hash + bytes([out_byte])).digest()
         return out_byte
-
-    def __del__(self):
-        """
-        Destructor clears sensitive keys from memory.
-        """
-        if hasattr(self, 'cyclic_state'):
-            self.cyclic_state = b'\x00' * len(self.cyclic_state)
 
 def encrypt(plaintext: bytes, key: bytes, prime: int = 100003) -> bytes:
     """
