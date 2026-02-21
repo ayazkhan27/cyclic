@@ -1,6 +1,6 @@
 import os
 import sys
-from khan_cipher.core import encrypt
+from khan_cipher.core import KhanKeystream, derive_key
 
 
 def main():
@@ -9,16 +9,19 @@ def main():
 
     chunk_size = 10 * 1024 * 1024
     master_key = os.urandom(32)
+    salt = os.urandom(16)
+    iv = os.urandom(16)
+    derived_key = derive_key(master_key, salt)
+    ksg = KhanKeystream(derived_key, 100003, iv)
 
     print("Generating 1GB of KHAN keystream data...")
     with open('benchmarks/data/khan_1GB.bin', 'wb') as f:
         bytes_written = 0
         while bytes_written < target_size:
-            plaintext = b'\x00' * min(chunk_size, target_size - bytes_written)
-            payload = encrypt(plaintext, master_key)
-            keystream = payload[32:-32]
-            f.write(keystream)
-            bytes_written += len(keystream)
+            sz = min(chunk_size, target_size - bytes_written)
+            chunk = bytes([ksg.get_next_byte() for _ in range(sz)])
+            f.write(chunk)
+            bytes_written += len(chunk)
             print(f"Written {bytes_written / 1024 / 1024:.2f} MB", end='\r')
             sys.stdout.flush()
 
