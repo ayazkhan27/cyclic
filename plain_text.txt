@@ -1,1 +1,0 @@
-This is a sample text to demonstrate the encryption and decryption process using the custom encryption algorithm.
