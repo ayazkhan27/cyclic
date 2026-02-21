@@ -18,7 +18,7 @@ def main():
     p_values = []
     with open(report_path, 'r') as f:
         lines = f.readlines()
-        
+
     for line in lines:
         if line.startswith("-") or line.startswith(" ") or "P-VALUE" in line or not line.strip():
             continue
